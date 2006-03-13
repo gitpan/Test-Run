@@ -21,6 +21,7 @@ my @fields= (qw(
     _old5lib
     bailout_reason
     callback
+    Debug
     error
     file
     last_test_print
@@ -32,6 +33,9 @@ my @fields= (qw(
     saw_bailout
     saw_header
     skip_all
+    Switches
+    Switches_Env
+    Test_Interpreter
     todo
     too_many_tests
     totals
@@ -331,7 +335,7 @@ sub analyze_file {
     }
 
     local $ENV{PERL5LIB} = $self->_INC2PERL5LIB;
-    if ( $Test::Run::Obj::Debug ) {
+    if ( $self->Debug() ) {
         local $^W=0; # ignore undef warnings
         $self->output()->print_message("# PERL5LIB=$ENV{PERL5LIB}");
     }
@@ -394,7 +398,7 @@ sub _command_line {
 Returns the command that runs the test.  Combine this with C<_switches()>
 to build a command line.
 
-Typically this is C<$^X>, but you can set C<$ENV{HARNESS_PERL}>
+Typically this is C<$^X>, but you can set C<$self->Test_Interpreter()>
 to use a different Perl than what you're running the harness under.
 This might be to run a threaded Perl, for example.
 
@@ -406,7 +410,7 @@ such as a PHP interpreter for a PHP-based strap.
 sub _command {
     my $self = shift;
 
-    return $ENV{HARNESS_PERL}           if defined $ENV{HARNESS_PERL};
+    return $self->Test_Interpreter()    if defined $self->Test_Interpreter();
     return Win32::GetShortPathName($^X) if $self->_is_win32();
     return $^X;
 }
@@ -421,7 +425,8 @@ Formats and returns the switches necessary to run the test.
 sub _switches {
     my($self, $file) = @_;
 
-    my @existing_switches = $self->_cleaned_switches( $Test::Run::Obj::Switches, $ENV{HARNESS_PERL_SWITCHES} );
+    # my @existing_switches = $self->_cleaned_switches( $Test::Run::Obj::Switches, $ENV{HARNESS_PERL_SWITCHES} );
+    my @existing_switches = $self->_cleaned_switches( $self->Switches(), $self->Switches_Env());
     my @derived_switches;
 
     local *TEST;

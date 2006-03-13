@@ -18,13 +18,10 @@ use Class::Accessor;
 
 use vars qw(
     $VERSION 
-    @ISA @EXPORT_OK 
-    $Switches
-    $switches
-    $Columns 
-    $has_time_hires
+    @ISA
 );
 
+use vars qw($has_time_hires);
 BEGIN {
     eval "use Time::HiRes 'time'";
     $has_time_hires = !$@;
@@ -32,7 +29,7 @@ BEGIN {
 
 =head1 NAME
 
-Test::Run - Run Perl standard test scripts with statistics
+Test::Run::Obj - Run Perl standard test scripts with statistics
 
 =head1 VERSION
 
@@ -40,12 +37,7 @@ Version 0.0100_06
 
 =cut
 
-$VERSION = "0.0100_06";
-
-# Backwards compatibility for exportable variable names.
-# REMOVED *verbose  = *Verbose;
-*switches = *Switches;
-# REMOVED *debug    = *Debug;
+$VERSION = "0.0100_07";
 
 $ENV{HARNESS_ACTIVE} = 1;
 $ENV{HARNESS_NG_VERSION} = $VERSION;
@@ -56,30 +48,23 @@ END {
     delete $ENV{HARNESS_NG_VERSION};
 }
 
-# Some experimental versions of OS/2 build have broken $?
-my $Ignore_Exitcode = $ENV{HARNESS_IGNORE_EXITCODE};
-
-# REMOVED: my $Files_In_Dir = $ENV{HARNESS_FILELEAK_IN_DIR};
-
 @ISA = ('Test::Run::Base', 'Exporter');
-@EXPORT_OK = qw($verbose $switches);
-
-# REMOVED $Verbose  = $ENV{HARNESS_VERBOSE} || 0;
-# REMOVED $Debug    = $ENV{HARNESS_DEBUG} || 0;
-$Switches = "-w";
-$Columns  = $ENV{HARNESS_COLUMNS} || $ENV{COLUMNS} || 80;
-$Columns--;             # Some shells have trouble with a full line of text.
-# REMOVED $Timer    = $ENV{HARNESS_TIMER} || 0;
 
 __PACKAGE__->mk_accessors(qw(
     _bonusmsg
+    Columns
     Debug
     Leaked_Dir
+    NoTty
     Strap
+    Switches
+    Switches_Env
+    Test_Interpreter
     Timer
     Verbose
     dir_files
     failed_tests
+    format_columns
     list_len
     max_namelen
     output
@@ -93,9 +78,14 @@ sub _get_simple_params
 {
     return
         [qw(
+            Columns
             Debug
             Leaked_Dir
+            NoTty
+            Switches
+            Switches_Env
             Verbose
+            Test_Interpreter
             Timer
             test_files
        )];
@@ -126,6 +116,8 @@ sub _initialize
 {
     my $self = shift;
     my (%args) = (@_);
+    $self->Columns(80);
+    $self->Switches("-w");
     $self->_init_simple_params(\%args);
     $self->dir_files([]);
     $self->output($self->_get_new_output(\%args));
@@ -148,20 +140,22 @@ sub _initialize
 =head1 DESCRIPTION
 
 B<STOP!> If all you want to do is write a test script, consider
-using Test::Simple.  Test::Run is the module that reads the
+using Test::Simple.  Test::Run::Obj is the module that reads the
 output from Test::Simple, Test::More and other modules based on
-Test::Builder.  You don't need to know about Test::Run to use
+Test::Builder.  You don't need to know about Test::Run::Obj to use
 those modules.
 
-Test::Run runs tests and expects output from the test in a
+Test::Run::Obj runs tests and expects output from the test in a
 certain format.  That format is called TAP, the Test Anything
-Protocol.  It is defined in L<Test::Run::TAP>.
+Protocol.  It is defined in L<Test::Harness::TAP>.
 
-C<Test::Run::runtests(@tests)> runs all the testscripts named
+C<$tester->runtests(@tests)> runs all the testscripts named
 as arguments and checks standard output for the expected strings
 in TAP format.
 
-The F<prove> utility is a thin wrapper around Test::Run.
+Test::Run::Obj provides a programmer API for running and analyzing
+the output of TAP files. For calling from the command line, look at
+L<Test::Run::CmdLine>.
 
 =head2 Taint mode
 
@@ -174,15 +168,80 @@ the test will be run with taint mode on.
 
 =head2 Object Parameters
 
+These parameters are accessors. They can be set at object creation by passing
+their name along with a value on the constructor (along with the compulsory
+C<'test_files'> argument):
+
+    my $tester = Test::Run::Obj->new(
+        'test_files' => \@mytests,
+        'Verbose' => 1,
+    );
+
+Alternatively, before C<runtests()> is called, they can be set by passing a 
+value to their accessor:
+
+    $tester->Verbose(1);
+
 =over 4
 
 =item C<$self-E<gt>Verbose()>
 
 The object variable C<$self-E<gt>Verbose()> can be used to let C<runtests()> 
-display the standard output of the script without altering the behavior 
-otherwise.  The F<prove> utility's C<-v> flag will set this.
+display the standard output of the script without altering the behavior
+otherwise.  The F<runprove> utility's C<-v> flag will set this.
 
-=back 
+=item C<$self-E<gt>Leaked_Dir()>
+
+When set to the name of a directory, C<$tester> will check after each
+test whether new files appeared in that directory, and report them as
+
+  LEAKED FILES: scr.tmp 0 my.db
+
+If relative, directory name is with respect to the current directory at
+the moment C<$tester-E<gt>runtests()> was called.  Putting the absolute path 
+into C<Leaked_Dir> will give more predictable results.
+
+=item C<$self-E<gt>Debug()> 
+
+If C<$self-E<gt>Debug()> is true, Test::Run will print debugging information
+about itself as it runs the tests.  This is different from
+C<$self-E<gt>Verbose()>, which prints the output from the test being run.
+
+=item C<$self-E<gt>Columns()>
+
+This value will be used for the width of the terminal. If it is not
+set then it will default to 80.
+
+=item C<$self-E<gt>Timer()>
+
+If set to true, and C<Time::HiRes> is available, print elapsed seconds
+after each test file.
+
+=item C<$self-E<gt>NoTty()>
+
+When set to a true value, forces it to behave as though STDOUT were
+not a console.  You may need to set this if you don't want harness to
+output more frequent progress messages using carriage returns.  Some
+consoles may not handle carriage returns properly (which results in a
+somewhat messy output).
+
+=item C<$self-E<gt>Test_Interprter()>
+
+Usually your tests will be run by C<$^X>, the currently-executing Perl.
+However, you may want to have it run by a different executable, such as
+a threading perl, or a different version.
+
+=item C<$self-E<gt>Switches()> and C<$self-E<gt>Switches_Env()>
+
+These two values will be prepended to the switches used to invoke perl on
+each test.  For example, setting one of them to C<-W> will
+run all tests with all warnings enabled.
+
+The difference between them is that C<Switches_Env()> is expected to be 
+filled in by the environment and C<Switches()> from other sources (like the
+programmer).
+
+=back
 
 =head2 Configuration variables.
 
@@ -197,11 +256,6 @@ Test::Run.  They are exported on request.
 The package variable C<$Test::Run::switches> is exportable and can be
 used to set perl command line options used for running the test
 script(s). The default value is C<-w>. It overrides C<HARNESS_SWITCHES>.
-
-=item C<$Test::Run::Timer>
-
-If set to true, and C<Time::HiRes> is available, print elapsed seconds
-after each test file.
 
 =back
 
@@ -307,11 +361,11 @@ sub _handle_runtests_error
 
     if (UNIVERSAL::isa($error, "Test::Run::Obj::Error::TestsFail"))
     {
-        die ($@->text() . "\n");
+        die $error->text();
     }
     else
     {
-        die $@;
+        die $error;
     }
 }
 
@@ -617,6 +671,10 @@ sub _time_single_test
 
     my $test_start_time = $self->Timer() ? time : 0;
     $self->Strap()->Verbose($self->Verbose());
+    $self->Strap()->Debug($self->Debug());
+    $self->Strap()->Test_Interpreter($self->Test_Interpreter());
+    $self->Strap()->Switches($self->Switches());
+    $self->Strap()->Switches_Env($self->Switches_Env());
     my $results = $self->Strap()->analyze_file($tfile) or
       do { warn $self->Strap()->{error}, "\n";  next };
     my $elapsed = $self->_get_elapsed('start_time' => $test_start_time);
@@ -850,7 +908,7 @@ sub _report_success
 
 sub _get_fail_no_tests_run_text
 {
-    return "FAILED--no tests were run for some reason."
+    return "FAILED--no tests were run for some reason.\n"
 }
 
 sub _fail_no_tests_run
@@ -861,13 +919,22 @@ sub _fail_no_tests_run
     );
 }
 
-sub _fail_no_tests_output
+sub _get_fail_no_tests_output_text
 {
     my $self = shift;
     my $num_tests = $self->tot()->tests();
-    my $blurb = $num_tests==1 ? "script" : "scripts";
-    die "FAILED--$num_tests test $blurb could be run, ".
+    my $blurb = "script" . $self->_get_s($num_tests);
+    
+    return "FAILED--$num_tests test $blurb could be run, ".
         "alas--no output ever seen\n";
+}
+
+sub _fail_no_tests_output
+{
+    my $self = shift;
+    die Test::Run::Obj::Error::TestsFail->new(
+        text => $self->_get_fail_no_tests_output_text(),
+    );
 }
 
 sub _print_final_stats
@@ -964,18 +1031,29 @@ sub _get_fmt_list_str_len
     return length($self->_get_format_list_str());
 }
 
+sub _get_num_columns
+{
+    my $self = shift;
+    # Some shells have trouble with a full line of text.
+    return ($self->Columns()-1);
+}
+
 sub _get_fmt_list_len
 {
     my ($self, %args) = (@_);
     my $max_nl_ref = $args{max_namelen};
 
-    my $list_len = $Columns - $self->_get_fmt_mid_str_len() - $$max_nl_ref;
+    $self->format_columns($self->_get_num_columns());
+
+    my $list_len = $self->format_columns() - $self->_get_fmt_mid_str_len() - $$max_nl_ref;
     if ($list_len < $self->_get_fmt_list_str_len()) {
         $list_len = $self->_get_fmt_list_str_len();
-        $$max_nl_ref = $Columns - $self->_get_fmt_mid_str_len() - $list_len;
+        $$max_nl_ref = $self->format_columns() - $self->_get_fmt_mid_str_len() - $list_len;
         if ($$max_nl_ref < $self->_get_format_failed_str_len()) {
             $$max_nl_ref = $self->_get_format_failed_str_len();
-            $Columns = $$max_nl_ref + $self->_get_fmt_mid_str_len() + $list_len;
+            $self->format_columns(
+                $$max_nl_ref + $self->_get_fmt_mid_str_len() + $list_len
+            );
         }
     }
     return $list_len;
@@ -1006,7 +1084,7 @@ sub _fail_other_print_top
         $self->_get_format_middle_str() .
         $self->_get_format_list_str()
     );
-    $self->_print_message("-" x $Columns);
+    $self->_print_message("-" x $self->format_columns());
 }
 
 sub _fail_other_get_canon_strings
@@ -1057,7 +1135,7 @@ sub _fail_other_print_test
     foreach my $c (@$canon_strings)
     {
         $self->_print_message(
-            sprintf((" " x ($Columns - $list_len) . 
+            sprintf((" " x ($self->format_columns() - $list_len) . 
                 "%s"),
                 $c
             ),
@@ -1065,7 +1143,8 @@ sub _fail_other_print_test
     }
 }
 
-sub _create_fmts {
+sub _create_fmts 
+{
     my $self = shift;
     my $failedtests = $self->failed_tests();
 
@@ -1074,34 +1153,66 @@ sub _create_fmts {
     return 0;
 }
 
+sub _get_fail_other_exception_text
+{
+    my $self = shift;
+    return "Failed " . $self->tot()->bad() . "/" .
+        $self->tot()->tests(). " test scripts, " .
+        $self->_get_tests_good_percent() . "% okay." .
+        $self->_get_sub_percent_msg() . "\n";
+}
+
+sub _fail_other_throw_exception
+{
+    my $self = shift;
+
+    die Test::Run::Obj::Error::TestsFail->new(
+        text => $self->_get_fail_other_exception_text(),
+    );
+}
+
+sub _fail_other_get_script_names
+{
+    my $self = shift;
+    return [ sort keys %{$self->failed_tests()} ]
+}
+
+sub _fail_other_print_all_tests
+{
+    my $self = shift;
+    # Now write to formats
+    for my $script (@{$self->_fail_other_get_script_names()})
+    {
+         $self->_fail_other_print_test($script);
+    }
+}
+
+sub _fail_other_print_bonus_message
+{
+    my $self = shift;
+    
+    my $bonusmsg = $self->_bonusmsg() || "";
+    $bonusmsg =~ s/^,\s*//;
+    if ($bonusmsg)
+    {
+        $self->_print_message("$bonusmsg.");
+    }
+}
+
 sub _fail_other
 {
     my $self = shift;
-    my $tot = $self->tot();
-    my $failed_tests = $self->failed_tests();
-
-    my $subpct = $self->_get_sub_percent_msg();
 
     $self->_create_fmts();
 
     $self->_fail_other_print_top();
 
-    # Now write to formats
-    for my $script (sort keys %$failed_tests) {
-      $self->_fail_other_print_test($script);
-    }
+    $self->_fail_other_print_all_tests();
 
-    if ($tot->bad())
+    if ($self->tot()->bad())
     {
-        my $bonusmsg = $self->_bonusmsg() || "";
-        $bonusmsg =~ s/^,\s*//;
-        if ($bonusmsg)
-        {
-            $self->_print_message("$bonusmsg.");
-        }
-        die "Failed " . $tot->bad() . "/" . $tot->tests(). " test scripts, " . 
-            $self->_get_tests_good_percent() . "% okay.".
-            "$subpct\n";
+        $self->_fail_other_print_bonus_message();
+        $self->_fail_other_throw_exception();
     }
 }
 
@@ -1297,9 +1408,10 @@ sub _dubious_return {
         else {
             $test->add_to_failed($test->next()..$test->max());
             $failed = @{$test->failed()};
-            (my $txt, $canon) = $self->_canonfailed($test);
+            my $txt;
+            ($txt, $canon) = $self->_canonfailed($test);
             $percent = 100*(scalar @{$test->failed()})/$test->max();
-            $self->_print_message("DIED. ", $txt);
+            $self->_print_message("DIED. " . $txt);
         }
     }
 
@@ -1457,78 +1569,9 @@ This is the version of Test::Run.
 
 =back
 
-=head1 ENVIRONMENT VARIABLES THAT AFFECT TEST::HARNESS
-
-=over 4
-
-=item C<HARNESS_COLUMNS>
-
-This value will be used for the width of the terminal. If it is not
-set then it will default to C<COLUMNS>. If this is not set, it will
-default to 80. Note that users of Bourne-sh based shells will need to
-C<export COLUMNS> for this module to use that variable.
-
-=item C<HARNESS_COMPILE_TEST>
-
-When true it will make harness attempt to compile the test using
-C<perlcc> before running it.
-
-B<NOTE> This currently only works when sitting in the perl source
-directory!
-
-=item C<HARNESS_DEBUG>
-
-If true, Test::Run will print debugging information about itself as
-it runs the tests.  This is different from C<HARNESS_VERBOSE>, which prints
-the output from the test being run.  Setting C<$Test::Run::Debug> will
-override this, or you can use the C<-d> switch in the F<prove> utility.
-
-=item C<HARNESS_FILELEAK_IN_DIR>
-
-When set to the name of a directory, harness will check after each
-test whether new files appeared in that directory, and report them as
-
-  LEAKED FILES: scr.tmp 0 my.db
-
-If relative, directory name is with respect to the current directory at
-the moment runtests() was called.  Putting absolute path into 
-C<HARNESS_FILELEAK_IN_DIR> may give more predictable results.
-
-=item C<HARNESS_IGNORE_EXITCODE>
-
-Makes harness ignore the exit status of child processes when defined.
-
-=item C<HARNESS_NOTTY>
-
-When set to a true value, forces it to behave as though STDOUT were
-not a console.  You may need to set this if you don't want harness to
-output more frequent progress messages using carriage returns.  Some
-consoles may not handle carriage returns properly (which results in a
-somewhat messy output).
-
-=item C<HARNESS_PERL>
-
-Usually your tests will be run by C<$^X>, the currently-executing Perl.
-However, you may want to have it run by a different executable, such as
-a threading perl, or a different version.
-
-If you're using the F<prove> utility, you can use the C<--perl> switch.
-
-=item C<HARNESS_PERL_SWITCHES>
-
-Its value will be prepended to the switches used to invoke perl on
-each test.  For example, setting C<HARNESS_PERL_SWITCHES> to C<-W> will
-run all tests with all warnings enabled.
-
-=item C<HARNESS_VERBOSE>
-
-If true, Test::Run will output the verbose results of running
-its tests.  Setting C<$Test::Run::verbose> will override this,
-or you can use the C<-v> switch in the F<prove> utility.
-
-=back
-
 =head1 EXAMPLE
+
+TODO: FIXME
 
 Here's how Test::Run tests itself
 
@@ -1607,13 +1650,22 @@ C<< <bug-test-harness >> at C<< rt.cpan.org> >>.
 
 =head1 AUTHORS
 
+Test::Run::Obj is based on L<Test::Harness>, and has later been spinned off
+as a separate module.
+
+=head2 Test:Harness Authors
+
 Either Tim Bunce or Andreas Koenig, we don't know. What we know for
 sure is, that it was inspired by Larry Wall's TEST script that came
 with perl distributions for ages. Numerous anonymous contributors
 exist.  Andreas Koenig held the torch for many years, and then
 Michael G Schwern.
 
-Current maintainer is Andy Lester C<< <andy at petdance.com> >>.
+Test::Harness was then maintained by Andy Lester C<< <andy at petdance.com> >>.
+
+=head2 Test::Run::Obj Authors
+
+Shlomi Fish C<< <shlomif@iglu.org.il> >>
 
 =head1 COPYRIGHT
 
