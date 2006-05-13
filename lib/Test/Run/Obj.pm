@@ -35,11 +35,11 @@ Test::Run::Obj - Run Perl standard test scripts with statistics
 
 =head1 VERSION
 
-Version 0.0100_06
+Version 0.0100_09
 
 =cut
 
-$VERSION = "0.0100_08";
+$VERSION = "0.0100_09";
 
 $ENV{HARNESS_ACTIVE} = 1;
 $ENV{HARNESS_NG_VERSION} = $VERSION;
@@ -1183,13 +1183,29 @@ sub _create_fmts
     return 0;
 }
 
+sub _get_fail_test_scripts_string
+{
+    my $self = shift;
+    return $self->tot()->bad() . "/" .
+        $self->tot()->tests(). " test scripts";
+}
+
+sub _get_fail_tests_good_percent_string
+{
+    my $self = shift;
+    return ", " .
+        $self->_get_tests_good_percent() . "% okay";
+}
+
 sub _get_fail_other_exception_text
 {
     my $self = shift;
-    return "Failed " . $self->tot()->bad() . "/" .
-        $self->tot()->tests(). " test scripts, " .
-        $self->_get_tests_good_percent() . "% okay." .
-        $self->_get_sub_percent_msg() . "\n";
+    return "Failed " . 
+        $self->_get_fail_test_scripts_string() . 
+        $self->_get_fail_tests_good_percent_string() .
+        "." .
+        $self->_get_sub_percent_msg() . 
+        "\n";
 }
 
 sub _fail_other_throw_exception
