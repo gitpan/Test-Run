@@ -165,24 +165,6 @@ my %samples = (
                                   all_ok => 1,
                                  },
             bailout           => 0,
-            combined          => {
-                                  total => {
-                                            bonus      => 1,
-                                            max        => 10,
-                                            'ok'       => 8,
-                                            files      => 1,
-                                            bad        => 1,
-                                            good       => 0,
-                                            tests      => 1,
-                                            sub_skipped=> 1,
-                                            'todo'     => 2,
-                                            skipped    => 0
-                                           },
-                                  failed => {
-                                             canon     => '3 9',
-                                            },
-                                  all_ok => 0,
-                                 },
             duplicates        => {
                                   total => {
                                             bonus      => 0,
@@ -512,8 +494,10 @@ SKIP: {
         select NULL;    # _run_all_tests() isn't as quiet as it should be.
         local $SIG{__WARN__} = sub { $warning .= join '', @_; };
         $obj = Test::Run::Obj->new(
-            test_files => [$test_path],
-            Switches => "@_INC -Mstrict",
+            {
+                test_files => [$test_path],
+                Switches => "@_INC -Mstrict",
+            }
         );
         ($failed) = 
           $obj->_run_all_tests();
@@ -526,7 +510,7 @@ SKIP: {
 
     SKIP: {
         skip "special tests for bailout", 1 unless $test eq 'bailout';
-        like( $@, '/Further testing stopped: GERONI/i' );
+        like( "$@", '/Further testing stopped: GERONI/i' );
     }
 
     SKIP: {

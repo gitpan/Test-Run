@@ -6,40 +6,45 @@ use vars qw($VERSION @ISA);
 $VERSION = '0.24';
 
 use Config;
+use TAPx::Parser;
+use List::Util qw(first);
+
 use Test::Run::Base;
 use Test::Run::Assert;
-use Test::Run::Iterator;
-use Test::Run::Point;
+use TAPx::Parser;
 use Test::Run::Obj::Structs;
 
 @ISA = (qw(Test::Run::Base::Struct));
 
 my @fields= (qw(
-    _is_macos
-    _is_vms
-    _is_win32
-    _old5lib
     bailout_reason
     callback
     Debug
     error
+    _event
+    exception
     file
+    _file_handle
+    _file_totals
+    _is_macos
+    _is_vms
+    _is_win32
     last_test_print
-    line
     lone_not_line
     max
     next
-    output
+    _old5lib
+    _parser
+    results
     saw_bailout
     saw_header
-    skip_all
+    _seen_header
     Switches
     Switches_Env
     Test_Interpreter
     todo
     too_many_tests
     totals
-    Verbose
 ));
 
 sub _get_fields
@@ -65,9 +70,9 @@ Test::Run::Straps - detailed analysis of test results
   my $strap = Test::Run::Straps->new;
 
   # Various ways to interpret a test
-  my %results = $strap->analyze($name, \@test_output);
-  my %results = $strap->analyze_fh($name, $test_filehandle);
-  my %results = $strap->analyze_file($test_file);
+  my $results = $strap->analyze($name, \@test_output);
+  my $results = $strap->analyze_fh($name, $test_filehandle);
+  my $results = $strap->analyze_file($test_file);
 
   # UNIMPLEMENTED
   my %total = $strap->total_results;
@@ -105,13 +110,12 @@ Initialize a new strap.
 
 sub _initialize {
     my $self = shift;
-    my (%args) = @_;
+    my $args = shift;
 
     $self->_is_vms( $^O eq 'VMS' );
     $self->_is_win32( $^O =~ /^(MS)?Win32$/ );
     $self->_is_macos( $^O eq 'MacOS' );
 
-    $self->output($args{output}); 
     $self->totals(+{});
     $self->todo(+{});
 }
@@ -131,170 +135,378 @@ newlines.
 
 =cut
 
-sub analyze {
-    my($self, $name, $test_output) = @_;
+sub _create_parser
+{
+    my ($self, $source) = @_;
+    return TAPx::Parser->new(
+            {
+                source => $source,
+            }
+        );
+}
 
-    my $it = Test::Run::Iterator->new($test_output);
-    return $self->_analyze_iterator($name, $it);
+sub analyze
+{
+    my($self, $name, $test_output_orig) = @_;
+
+    # Assign it here so it won't be passed around.
+    $self->file($name);
+
+    $self->_parser($self->_create_parser($test_output_orig));
+
+    return $self->_analyze_with_parser();
 }
 
 sub _init_totals_obj_instance
 {
-    my $self = shift;
-    return Test::Run::Straps::StrapsTotalsObj->new(@_);
+    my ($self, $args) = @_;
+    return Test::Run::Straps::StrapsTotalsObj->new($args);
 }
 
 sub _init_details_obj_instance
 {
-    my $self = shift;
-    return Test::Run::Straps::StrapsDetailsObj->new(@_);
+    my ($self, $args) = @_;
+    return Test::Run::Straps::StrapsDetailsObj->new($args);
 }
 
-sub _analyze_iterator {
-    my($self, $name, $it) = @_;
+sub _get_initial_totals_obj_params
+{
+    return
+    {
+        max      => 0,
+        seen     => 0,
+
+        ok       => 0,
+        todo     => 0,
+        skip     => 0,
+        bonus    => 0,
+
+        details  => [],
+    };
+}
+
+sub _start_new_file
+{
+    my $self = shift;
 
     $self->_reset_file_state;
-    $self->file($name);
-    my $totals = 
+    my $totals =
         $self->_init_totals_obj_instance(
-            max      => 0,
-            seen     => 0,
-
-            ok       => 0,
-            todo     => 0,
-            skip     => 0,
-            bonus    => 0,
-
-            details  => [],
+            $self->_get_initial_totals_obj_params(),
         );
 
+    $self->_file_totals($totals);
+
     # Set them up here so callbacks can have them.
-    $self->totals()->{$name}         = $totals;
-    while( defined(my $line = $it->next) ) {
-        $self->_analyze_line($line, $totals);
+    $self->totals()->{$self->file()}         = $totals;
+
+    return;
+}
+
+sub _get_next_event
+{
+    my ($self) = @_;
+
+    return $self->_event(scalar($self->_parser->next()));
+}
+
+sub _end_file
+{
+    my $self = shift;
+
+    $self->_file_totals->determine_passing();
+
+    $self->_parser(undef);
+    $self->_event(undef);
+
+    return;
+}
+
+sub _handle_bailout_event
+{
+    my $self = shift;
+
+    $self->bailout_reason($self->_event->explanation());
+    $self->saw_bailout(1);
+
+    return;
+}
+
+sub _events_loop
+{
+    my $self = shift;
+
+    while ($self->_get_next_event())
+    {
+        $self->_analyze_event();
         last if $self->saw_bailout();
     }
 
-    if (defined($self->skip_all()))
-    {
-        $totals->skip_all($self->skip_all()) 
-    }
-    $totals->determine_passing();
-
-    return $totals;
+    return;
 }
 
+sub _analyze_with_parser
+{
+    my($self) = @_;
 
-sub _analyze_line {
+    $self->_start_new_file();
+
+    $self->_events_loop();
+
+    $self->_end_file();
+
+    return $self->_file_totals;
+}
+
+sub _invoke_cb
+{
     my $self = shift;
-    my $line = shift;
-    my $totals = shift;
-
-    $self->inc_field('line');
-
-    my $linetype;
-    my $point = Test::Run::Point->from_test_line( $line );
-    if ( $point ) {
-        $linetype = 'test';
-
-        $totals->inc_field('seen');
-        $point->set_number( $self->next()) unless $point->number;
-
-        # sometimes the 'not ' and the 'ok' are on different lines,
-        # happens often on VMS if you do:
-        #   print "not " unless $test;
-        #   print "ok $num\n";
-        if ( $self->lone_not_line() && ($self->lone_not_line() == $self->line() - 1) ) {
-            $point->set_ok( 0 );
-        }
-
-        if ( $self->todo()->{$point->number} ) {
-            $point->set_directive_type( 'todo' );
-        }
-
-        if ( $point->is_todo ) {
-            $totals->inc_field('todo');
-            if ($point->ok)
-            {
-                $totals->inc_field('bonus');
-            }
-        }
-        elsif ( $point->is_skip ) {
-            $totals->inc_field('skip');
-        }
-
-        if ($point->pass)
-        {
-            $totals->inc_field('ok');
-        }
-
-        if ( ($point->number > 100_000) && ($point->number > ($self->max()||100_000)) ) {
-            if ( !$self->too_many_tests() ) {
-                warn "Enormous test number seen [test ", $point->number, "]\n";
-                warn "Can't detailize, too big.\n";
-                $self->too_many_tests(1);
-            }
-        }
-        else {
-            my $details =
-                $self->_init_details_obj_instance(
-                    ok          => $point->pass,
-                    actual_ok   => $point->ok,
-                    name        => _def_or_blank( $point->description ),
-                    type        => _def_or_blank( $point->directive_type ),
-                    reason      => _def_or_blank( $point->directive_reason ),
-                );
-
-            assert( defined( $details->ok() ) && defined( $details->actual_ok() ) );
-            $totals->details()->[$point->number - 1] = $details;
-        }
-    } # test point
-    elsif ( $line =~ /^not\s+$/ ) {
-        $linetype = 'other';
-        # Sometimes the "not " and "ok" will be on separate lines on VMS.
-        # We catch this and remember we saw it.
-        $self->lone_not_line($self->line());
-    }
-    elsif ( $self->_is_header($line) ) {
-        $linetype = 'header';
-
-        $self->inc_field('saw_header');
-
-        $totals->add_to_field('max', $self->max());
-    }
-    elsif ( $self->_is_bail_out($line) ) {
-        $linetype = 'bailout';
-        $self->saw_bailout(1);
-    }
-    elsif (my $diagnostics = $self->_is_diagnostic_line( $line )) {
-        $linetype = 'other';
-        my $test = $totals->details()->[-1];
-        if (defined($test))
-        {
-            $test->append_to_diag($diagnostics);
-        }
-    }
-    else {
-        $linetype = 'other';
-    }
+    my $args = shift;
 
     if ($self->callback())
     {
-        $self->callback()->($self, $line, $linetype, $totals);
+        $self->callback()->(
+            $args
+        );
     }
+}
 
-    if ($point)
+sub _call_callback
+{
+    my $self = shift;
+    return $self->_invoke_cb(
+        {
+            type => "tap_event",
+            event => $self->_event(),
+            totals => $self->_file_totals(),
+        }
+    );
+}
+
+sub _bump_next
+{
+    my $self = shift;
+
+    if ($self->_event->is_test())
     {
-        $self->next($point->number + 1) 
+        $self->next($self->_event->number + 1) 
     }
-} # _analyze_line
+}
 
+sub _is_event_todo
+{
+    my $self = shift;
+    
+    return $self->_event->has_todo();
+}
 
-sub _is_diagnostic_line {
-    my ($self, $line) = @_;
-    return if index( $line, '# Looks like you failed' ) == 0;
-    $line =~ s/^#\s//;
-    return $line;
+sub _is_event_pass
+{
+    my $self = shift;
+
+    return 
+    (
+        $self->_event->passed() ||
+        $self->_is_event_todo() ||
+        $self->_event->has_skip()
+    );
+}
+
+sub _update_details
+{
+    my $self = shift;
+
+    my $event = $self->_event;
+
+    my $details =
+        $self->_init_details_obj_instance(
+            {
+                ok          => $self->_is_event_pass(),
+                actual_ok   => scalar($event->passed),
+                name        => _def_or_blank( $event->description ),
+                # $event->directive returns "SKIP" or "TODO" in uppercase
+                # and we expect them to be in lowercase.
+                type        => lc(_def_or_blank( $event->directive )),
+                reason      => _def_or_blank( $event->explanation ),
+            },
+        );
+
+    assert( defined( $details->ok() ) && defined( $details->actual_ok() ) );
+    $self->_file_totals->details()->[$event->number - 1] = $details;
+
+    return;
+}
+
+sub _handle_comment_event
+{
+    my $self = shift;
+
+    my $test = $self->_file_totals->last_detail();
+    if (defined($test))
+    {
+        $test->append_to_diag($self->_event->comment());
+    }
+
+    return;
+}
+
+sub _is_enormous_event_num
+{
+    my $self = shift;
+
+    return 
+    (
+        ($self->_event->number > 100_000)
+            &&
+        ($self->_event->number > ($self->max()||100_000))
+    )
+}
+
+sub _handle_enormous_event_num
+{
+    my $self = shift;
+
+    if ( !$self->too_many_tests() )
+    {
+        warn "Enormous test number seen [test ", $self->_event->number, "]\n";
+        warn "Can't detailize, too big.\n";
+        $self->too_many_tests(1);
+    }
+}
+
+sub _update_details_wrapper
+{
+    my $self = shift;
+
+    my $event = $self->_event;
+
+    if ($self->_is_enormous_event_num())
+    {
+        $self->_handle_enormous_event_num();
+    }
+    else
+    {
+        $self->_update_details();
+    }
+}
+
+sub _handle_labeled_test_event
+{
+    my $self = shift;
+
+    my $event = $self->_event;
+    my $totals = $self->_file_totals();
+
+    if ($self->_is_event_todo())
+    {
+        $totals->inc_field('todo');
+        if ( $event->actual_passed() )
+        {
+            $totals->inc_field('bonus');
+        }
+    }
+    elsif ( $event->has_skip ) {
+        $totals->inc_field('skip');
+    }
+
+    return;
+}
+
+sub _update_if_pass
+{
+    my $self = shift;
+
+    if ($self->_is_event_pass())
+    {
+        $self->_file_totals->inc_field('ok');
+    }
+
+    return;
+}
+
+sub _inc_seen
+{
+    my $self = shift;
+
+    $self->_file_totals->inc_field('seen');
+}
+
+sub _inc_seen_header
+{
+    my $self = shift;
+
+    $self->inc_field('_seen_header');
+}
+
+sub _handle_test_event
+{
+    my $self = shift;
+
+    $self->_inc_seen();
+    $self->_handle_labeled_test_event();
+    $self->_update_if_pass();
+    $self->_update_details_wrapper();
+
+    return;
+}
+
+sub _handle_plan_event
+{
+    my $self = shift;
+
+    $self->inc_field('saw_header');
+    $self->_file_totals->max($self->_event->tests_planned());
+    # If it's a skip line.
+    if ($self->_event->tests_planned() == 0)
+    {
+        my $reason = $self->_event->explanation();
+        $reason =~ s{^[\w:]+\s?}{};
+        $self->_file_totals->skip_all($reason);
+    }
+
+    return;
+}
+
+sub _get_event_types_cascade
+{
+    return [qw(test plan bailout comment)];
+}
+
+=head2 $self->_handle_event()
+
+Handles the current event according to the list of types in the cascade. It
+checks each type and if matches calls the appropriate 
+C<_handle_${type}_event> callback. Returns the type of the event that matched.
+
+=cut
+
+sub _handle_event
+{
+    my $self = shift;
+
+    my $event = $self->_event;
+
+    EVENT_TYPES:
+    foreach my $type (@{$self->_get_event_types_cascade()})
+    {
+        if ($event->can("is_$type")->($event))
+        {
+            $self->can("_handle_${type}_event")->($self);
+            return $type;
+        }
+    }
+
+    return;
+}
+
+sub _analyze_event
+{
+    my $self = shift;
+
+    $self->_handle_event();
+
+    $self->_call_callback();
+    $self->_bump_next();
 }
 
 =head2 $strap->analyze_fh( $name, $test_filehandle )
@@ -305,11 +517,13 @@ Like C<analyze>, but it reads from the given filehandle.
 
 =cut
 
-sub analyze_fh {
-    my($self, $name, $fh) = @_;
+sub analyze_fh
+{
+    my $self = shift;
 
-    my $it = Test::Run::Iterator->new($fh);
-    return $self->_analyze_iterator($name, $it);
+    $self->_parser($self->_create_parser($self->_file_handle()));
+
+    return $self->_analyze_with_parser();
 }
 
 =head2 $strap->analyze_file( $test_file )
@@ -321,8 +535,11 @@ results.  It will also use that name for the total report.
 
 =cut
 
-sub analyze_file {
-    my($self, $file) = @_;
+sub _get_analysis_file_handle
+{
+    my($self) = @_;
+
+    my $file = $self->file();
 
     unless( -e $file ) {
         $self->error("$file does not exist");
@@ -335,33 +552,82 @@ sub analyze_file {
     }
 
     local $ENV{PERL5LIB} = $self->_INC2PERL5LIB;
-    if ( $self->Debug() ) {
-        local $^W=0; # ignore undef warnings
-        $self->output()->print_message("# PERL5LIB=$ENV{PERL5LIB}");
-    }
+    $self->_invoke_cb({'type' => "report_start_env"});
 
     # *sigh* this breaks under taint, but open -| is unportable.
     my $line = $self->_command_line($file);
 
-    unless ( open(FILE, "$line|" )) {
-        $self->output()->print_message("can't run $file. $!");
+    my $file_handle;
+    unless ( open($file_handle, "$line|" )) {
+        $self->_invoke_cb(
+            {
+                type => "could_not_run_script",
+                cmd_line => $line,
+                file => $file,
+                error => $!,
+            }
+        );
         return;
     }
 
-    my $results = $self->analyze_fh($file, \*FILE);
-    my $exit    = close FILE;
+    $self->_restore_PERL5LIB();
+
+    return $self->_file_handle($file_handle);
+}
+
+sub _cleanup_analysis
+{
+    my ($self) = @_;
+
+    my $results = $self->results();
+
+    close ($self->_file_handle());
+    $self->_file_handle(undef);
+
+    if ($self->exception() ne "")
+    {
+        die $self->exception();
+    }
+
     $results->wait($?);
     if( $? && $self->_is_vms() ) {
-        eval q{use vmsish "status"; $results{'exit'} = $?};
+        eval q{use vmsish "status"; $results->exit($?)};
     }
     else {
         $results->exit(_wait2exit($?));
     }
     $results->passing(0) unless $? == 0;
 
-    $self->_restore_PERL5LIB();
+    return;
+}
 
-    return $results;
+sub _analyze_fh_wrapper
+{
+    my ($self, $file) = @_;
+
+    eval {
+    $self->results($self->analyze_fh());
+    };
+    $self->exception($@);
+
+    return;
+}
+
+sub analyze_file
+{
+    my ($self, $file) = @_;
+
+    # Assign it here so it won't be passed around.
+    $self->file($file);
+
+    $self->_get_analysis_file_handle()
+        or return;
+
+    $self->_analyze_fh_wrapper();
+
+    $self->_cleanup_analysis();
+
+    return $self->results();
 }
 
 
@@ -415,6 +681,47 @@ sub _command {
     return $^X;
 }
 
+sub _handle_test_file_opening_error
+{
+    my ($self, $args) = @_;
+
+    $self->_invoke_cb({type => "test_file_opening_error", %$args});
+}
+
+sub _handle_test_file_closing_error
+{
+    my ($self, $args) = @_;
+
+    $self->_invoke_cb({type => "test_file_closing_error", %$args});
+}
+
+sub _get_shebang
+{
+    my($self, $file) = @_;
+
+    my $test_fh;
+    if (!open($test_fh, $file))
+    {
+        $self->_handle_test_file_opening_error(
+            {
+                file => $file,
+                error => $!,
+            }
+        );
+        return "";
+    }
+    my $shebang = <$test_fh>;
+    if (!close($test_fh))
+    {
+        $self->_handle_test_file_closing_error(
+            {
+                file => $file,
+                error => $1,
+            }
+        );
+    }
+    return $shebang;
+}
 
 =head2 $strap->_switches( $file )
 
@@ -429,10 +736,7 @@ sub _switches {
     my @existing_switches = $self->_cleaned_switches( $self->Switches(), $self->Switches_Env());
     my @derived_switches;
 
-    local *TEST;
-    open(TEST, $file) or $self->output()->print_message("can't open $file. $!");
-    my $shebang = <TEST>;
-    close(TEST) or $self->output()->print_message("can't close $file. $!");
+    my $shebang = $self->_get_shebang($file);
 
     my $taint = ( $shebang =~ /^#!.*\bperl.*\s-\w*([Tt]+)/ );
     push( @derived_switches, "-$1" ) if $taint;
@@ -441,15 +745,15 @@ sub _switches {
     # all that on the command line as -Is.
     # MacPerl's putenv is broken, so it will not see PERL5LIB, tainted or not.
     if ( $taint || $self->_is_macos() ) {
-	my @inc = $self->_filtered_INC;
-	push @derived_switches, map { "-I$_" } @inc;
+        my @inc = $self->_filtered_INC;
+        push @derived_switches, map { "-I$_" } @inc;
     }
 
     # Quote the argument if there's any whitespace in it, or if
     # we're VMS, since VMS requires all parms quoted.  Also, don't quote
     # it if it's already quoted.
     for ( @derived_switches ) {
-	$_ = qq["$_"] if ((/\s/ || $self->_is_vms()) && !/^".*"$/ );
+        $_ = qq["$_"] if ((/\s/ || $self->_is_vms()) && !/^".*"$/ );
     }
     return join( " ", @existing_switches, @derived_switches );
 }
@@ -463,15 +767,15 @@ Returns only defined, non-blank, trimmed switches from the parms passed.
 sub _cleaned_switches {
     my $self = shift;
 
-    local $_;
+    my @input = @_;
 
     my @switches;
-    for ( @_ ) {
-	my $switch = $_;
-	next unless defined $switch;
-	$switch =~ s/^\s+//;
-	$switch =~ s/\s+$//;
-	push( @switches, $switch ) if $switch ne "";
+    for my $switch ( @input )
+    {
+        next unless defined $switch;
+        $switch =~ s/^\s+//;
+        $switch =~ s/\s+$//;
+        push( @switches, $switch ) if $switch ne "";
     }
 
     return @switches;
@@ -508,14 +812,13 @@ sub _filtered_INC {
     @inc = @INC unless @inc;
 
     if( $self->_is_vms() ) {
-	# VMS has a 255-byte limit on the length of %ENV entries, so
-	# toss the ones that involve perl_root, the install location
+        # VMS has a 255-byte limit on the length of %ENV entries, so
+        # toss the ones that involve perl_root, the install location
         @inc = grep !/perl_root/i, @inc;
-
     }
     elsif ( $self->_is_win32() ) {
-	# Lose any trailing backslashes in the Win32 paths
-	s/[\\\/+]$// foreach @inc;
+        # Lose any trailing backslashes in the Win32 paths
+        s/[\\\/+]$// foreach @inc;
     }
 
     my %seen;
@@ -560,103 +863,11 @@ sub _restore_PERL5LIB {
 
 Methods for identifying what sort of line you're looking at.
 
-=head2 C<_is_diagnostic>
-
-    my $is_diagnostic = $strap->_is_diagnostic($line, \$comment);
-
-Checks if the given line is a comment.  If so, it will place it into
-C<$comment> (sans #).
-
-=cut
-
-sub _is_diagnostic {
-    my($self, $line, $comment) = @_;
-
-    if( $line =~ /^\s*\#(.*)/ ) {
-        $$comment = $1;
-        return $YES;
-    }
-    else {
-        return $NO;
-    }
-}
-
-=head2 C<_is_header>
-
-  my $is_header = $strap->_is_header($line);
-
-Checks if the given line is a header (1..M) line.  If so, it places how
-many tests there will be in C<< $strap->{max} >>, a list of which tests
-are todo in C<< $strap->{todo} >> and if the whole test was skipped
-C<< $strap->{skip_all} >> contains the reason.
-
-=cut
-
-# Regex for parsing a header.  Will be run with /x
-my $Extra_Header_Re = <<'REGEX';
-                       ^
-                        (?: \s+ todo \s+ ([\d \t]+) )?      # optional todo set
-                        (?: \s* \# \s* ([\w:]+\s?) (.*) )?     # optional skip with optional reason
-REGEX
-
-sub _is_header {
-    my($self, $line) = @_;
-
-    if( my($max, $extra) = $line =~ /^1\.\.(\d+)(.*)/ ) {
-        $self->max($max);
-        assert( $self->max() >= 0,  'Max # of tests looks right' );
-
-        if( defined $extra ) {
-            my($todo, $skip, $reason) = $extra =~ /$Extra_Header_Re/xo;
-
-            if ($todo)
-            {
-                $self->todo(+{ map { $_ => 1 } split /\s+/, $todo });
-            }
-
-            if( $self->max() == 0 ) {
-                $reason = '' unless defined $skip and $skip =~ /^Skip/i;
-            }
-
-            $self->skip_all($reason);
-        }
-
-        return $YES;
-    }
-    else {
-        return $NO;
-    }
-}
-
-=head2 C<_is_bail_out>
-
-  my $is_bail_out = $strap->_is_bail_out($line, \$reason);
-
-Checks if the line is a "Bail out!".  Places the reason for bailing
-(if any) in $reason.
-
-=cut
-
-sub _is_bail_out {
-    my($self, $line) = @_;
-
-    if( $line =~ /^Bail out!\s*(.*)/i ) {
-        if ($1)
-        {
-            $self->bailout_reason($1);
-        }
-        return $YES;
-    }
-    else {
-        return $NO;
-    }
-}
-
 =head2 C<_reset_file_state>
 
   $strap->_reset_file_state;
 
-Resets things like C<< $strap->{max} >> , C<< $strap->{skip_all} >>,
+Resets things like C<< $strap->{max} >>,
 etc. so it's ready to parse the next file.
 
 =cut
@@ -664,10 +875,10 @@ etc. so it's ready to parse the next file.
 sub _reset_file_state {
     my($self) = shift;
 
-    delete @{$self}{qw(max skip_all too_many_tests)};
+    delete @{$self}{qw(max too_many_tests)};
     $self->todo(+{});
     
-    foreach my $field (qw(line saw_header saw_bailout lone_not_line))
+    foreach my $field (qw(saw_header saw_bailout lone_not_line))
     {
         $self->set($field, 0);
     }

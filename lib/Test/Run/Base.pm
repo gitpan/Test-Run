@@ -18,6 +18,25 @@ sub new
     return $self;
 }
 
+=head2 $dest->copy_from($source, [@fields])
+
+Assigns the fields C<@fields> using their accessors based on their values
+in C<$source>.
+
+=cut
+
+sub copy_from
+{
+    my ($dest, $source, $fields) = @_;
+
+    foreach my $f (@$fields)
+    {
+        $dest->$f($source->$f());
+    }
+
+    return;
+}
+
 package Test::Run::Base::Struct;
 
 use vars (qw(@ISA));
@@ -39,16 +58,18 @@ sub _get_fields_map
     return +{ map { $_ => 1 } @{$self->_get_fields()} };
 }
 
+use Carp;
+
 sub _initialize
 {
-    my $self = shift;
-    my (%args) = @_;
-
+    my ($self, $args) = @_;
+    
+    Carp::confess '$args not a hash' if (ref($args) ne "HASH");
     $self->_pre_init();
 
     my $fields_map = $self->_get_fields_map();
 
-    while (my ($k, $v) = each(%args))
+    while (my ($k, $v) = each(%$args))
     {
         if (exists($fields_map->{$k}))
         {
@@ -56,7 +77,7 @@ sub _initialize
         }
         else
         {
-            die "Called with undefined field \"$k\"";
+            Carp::confess "Called with undefined field \"$k\"";
         }
     }
 }
@@ -76,7 +97,7 @@ sub add_to_field
     }
     else
     {
-        die "Trying to increment non-existent field \"$field\"";
+        Carp::confess "Trying to increment non-existent field \"$field\"";
     }
 }
 

@@ -1,14 +1,16 @@
+Build.PL
 Changes
 examples/mini_harness.plx
+inc/Test/Run/Builder.pm
 lib/Test/Run/Assert.pm
 lib/Test/Run/Base.pm
+lib/Test/Run/Core.pm
 lib/Test/Run/Iface.pm
-lib/Test/Run/Iterator.pm
 lib/Test/Run/Obj/Error.pm
 lib/Test/Run/Obj.pm
 lib/Test/Run/Obj/Structs.pm
 lib/Test/Run/Output.pm
-lib/Test/Run/Point.pm
+lib/Test/Run/Plugin/CmdLine/Output.pm
 lib/Test/Run/Straps.pm
 Makefile.PL
 MANIFEST
@@ -31,7 +33,6 @@ t/pod.t
 t/sample-tests/bailout
 t/sample-tests/bignum
 t/sample-tests/bignum_many
-t/sample-tests/combined
 t/sample-tests/descriptive
 t/sample-tests/die
 t/sample-tests/die_head_end
@@ -51,6 +52,7 @@ t/sample-tests/simple_fail
 t/sample-tests/skip
 t/sample-tests/skipall
 t/sample-tests/skipall_nomsg
+t/sample-tests/skip_and_todo
 t/sample-tests/skip_nomsg
 t/sample-tests/switches
 t/sample-tests/taint
