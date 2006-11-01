@@ -11,7 +11,6 @@ use List::Util qw(first);
 
 use Test::Run::Base;
 use Test::Run::Assert;
-use TAPx::Parser;
 use Test::Run::Obj::Structs;
 
 @ISA = (qw(Test::Run::Base::Struct));
@@ -716,7 +715,7 @@ sub _get_shebang
         $self->_handle_test_file_closing_error(
             {
                 file => $file,
-                error => $1,
+                error => $!,
             }
         );
     }
