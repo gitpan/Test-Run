@@ -41,11 +41,11 @@ Test::Run::Core - Run Perl standard test scripts with statistics
 
 =head1 VERSION
 
-Version 0.0106
+Version 0.0107
 
 =cut
 
-$VERSION = '0.0106';
+$VERSION = '0.0107';
 
 $ENV{HARNESS_ACTIVE} = 1;
 $ENV{HARNESS_NG_VERSION} = $VERSION;
@@ -580,7 +580,7 @@ sub _get_failed_and_max_msg
     my ($self) = @_;
     my $test = $self->last_test_obj;
 
-    my ($txt) = $self->_canonfailed($test);
+    my ($txt) = $self->_canonfailed();
 
     return ($test->ml().$txt);
 }
@@ -648,7 +648,7 @@ sub _get_failed_and_max_params
     
     my $test = $self->last_test_obj;
 
-    my (undef, $canon) = $self->_canonfailed($test);
+    my (undef, $canon) = $self->_canonfailed();
 
     return 
         [
@@ -761,14 +761,14 @@ sub _get_wstatus
 {
     my $self = shift;
 
-    return $self->last_test_results()->{'wait'};
+    return $self->last_test_results->wait;
 }
 
 sub _get_estatus
 {
     my $self = shift;
 
-    return $self->last_test_results()->{'exit'};
+    return $self->last_test_results->exit;
 }
 
 sub _is_last_test_seen
@@ -852,7 +852,7 @@ sub _get_copied_strap_fields
 
 sub _init_strap
 {
-    my ($self, $tfile) = @_;
+    my ($self) = @_;
 
     $self->Strap()->copy_from($self, $self->_get_copied_strap_fields());
 }
@@ -860,17 +860,17 @@ sub _init_strap
 sub _time_single_test
 {
     my $self = shift;
-    my $tfile = shift;
+    my $args = shift;
 
     my $test_start_time = $self->Timer() ? time : 0;
 
-    $self->_init_strap($tfile);
+    $self->_init_strap();
     $self->Strap()->callback(sub { $self->_strap_callback(@_); });
     # We trap exceptions so we can nullify the callback to avoid memory
     # leaks.
     my $results;
     eval {
-        $results = $self->Strap()->analyze_file($tfile) or
+        $results = $self->Strap()->analyze_file($args->{test_file}) or
           do { warn $self->Strap()->error(), "\n";  next };
     };
     $self->Strap()->callback(undef);
@@ -879,8 +879,12 @@ sub _time_single_test
         die $@;
     }
     
-    my $elapsed = $self->_get_elapsed({'start_time' => $test_start_time});
-    return ($results, $elapsed);
+    $self->last_test_elapsed(
+        $self->_get_elapsed({'start_time' => $test_start_time})
+    );
+    $self->last_test_results($results);
+    
+    return;
 }
 
 =head2 $self->_report_skipped_test()
@@ -1038,14 +1042,12 @@ sub _is_test_passing
 {
     my $self = shift;
 
-    return $self->last_test_results->{passing};
+    return $self->last_test_results->passing;
 }
 
 sub _process_test_file_results
 {
     my ($self) = @_;
-
-    $self->_calc_test_struct();
 
     if ($self->_is_test_passing()) 
     {
@@ -1064,14 +1066,11 @@ sub _run_single_test
 {
     my ($self, $args) = @_;
 
-    my $tfile = $args->{'test_file'};
-
     $self->_prepare_for_single_test_run($args);
 
-    my ($results, $elapsed) = $self->_time_single_test($tfile);
+    $self->_time_single_test($args);
 
-    $self->last_test_results($results);
-    $self->last_test_elapsed($elapsed);
+    $self->_calc_test_struct();
 
     $self->_process_test_file_results();
 
@@ -1762,11 +1761,11 @@ sub _get_premature_test_dubious_summary
 
     $test->add_to_failed($test->next()..$test->max());
 
-    my (undef, $canon) = $self->_canonfailed($test);
+    my (undef, $canon) = $self->_canonfailed();
 
     $self->_report_premature_test_dubious_summary();
 
-    return 
+    return
     {
         failed => scalar(@{$test->failed()}),
         canon => $canon,
@@ -1811,19 +1810,9 @@ sub _get_dubious_summary
 
 }
 
-# Test program go boom.
-sub _dubious_return 
+sub _calc_dubious_return_ret_value
 {
-    my ($self) = @_;
-    
-    my $test = $self->last_test_obj;
-    my $estatus = $self->_get_estatus();
-    my $wstatus = $self->_get_wstatus();
-    my $filename = $self->_get_last_test_filename();
-    
-    $self->_report_dubious();
-
-    $self->_tot_inc('bad');
+    my $self = shift;
 
     my $dubious_summary = $self->_get_dubious_summary();
 
@@ -1831,12 +1820,24 @@ sub _dubious_return
         $self->_create_failed_obj_instance(
             {
                 %{$dubious_summary},
-                max => $test->max() || '??',
-                estat => $estatus,
-                wstat => $wstatus,
-                name => $filename,
+                max => $self->last_test_obj->max() || '??',
+                estat => $self->_get_estatus(),
+                wstat => $self->_get_wstatus(),
+                name => $self->_get_last_test_filename(),
             }
         );
+}
+
+# Test program go boom.
+sub _dubious_return 
+{
+    my ($self) = @_;
+    
+    $self->_report_dubious();
+
+    $self->_tot_inc('bad');
+
+    return $self->_calc_dubious_return_ret_value();
 }
 
 sub filter_failed
@@ -1858,10 +1859,12 @@ sub _get_failed_string
 sub _canonfailed_get_canon_ranges
 {
     my ($self, $failed) = @_;
-    my $min = shift @$failed;
+
+    my @failed_copy = @$failed;
+    my $min = shift @failed_copy;
     my $last = $min;
     my @canon;
-    for my $test (@$failed, $failed->[-1]) # don't forget the last one
+    for my $test (@failed_copy, $failed_copy[-1]) # don't forget the last one
     {
         if ($test > $last+1 || $test == $last) {
             push @canon, ($min == $last) ? $last : "$min-$last";
@@ -1885,34 +1888,43 @@ sub _canonfailed_get_canon_helper
     }
 }
 
+sub _get_failed_list
+{
+    my $self = shift;
+
+    return$self->last_test_obj->failed
+}
+
+sub _canonfailed_get_failed
+{
+    my $self = shift;
+
+    return $self->filter_failed($self->_get_failed_list());
+}
+
 sub _canonfailed_get_canon
 {
-    my ($self, $args) = @_;
+    my ($self) = @_;
 
-    my $failed_in = $args->{failed_in};
-
-    my $failed = $self->filter_failed($failed_in);
-    my $failed_num = @$failed;
+    my $failed = $self->_canonfailed_get_failed();
 
     my $canon = $self->_canonfailed_get_canon_helper($failed);
+
     return Test::Run::Obj::CanonFailedObj->new(
         {
             canon => join(' ', @$canon),
             result => [$self->_get_failed_string($canon)],
-            failed_num => $failed_num,
+            failed_num => scalar(@$failed),
         },
     );
 }
 
 sub _canonfailed {
-    my ($self, $test) = @_;
+    my ($self) = @_;
 
-    my $canon_obj =
-        $self->_canonfailed_get_canon(
-            {
-                'failed_in' => $test->failed(),
-            },
-        );
+    my $test = $self->last_test_obj;
+
+    my $canon_obj = $self->_canonfailed_get_canon();
 
     $canon_obj->add_Failed($test);
     $canon_obj->add_skipped($test);
