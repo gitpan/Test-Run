@@ -5,6 +5,8 @@ use Test::More tests => 1;
 
 use File::Spec;
 
+use Test::Trap qw( trap $trap :flow:stderr(systemsafe):stdout(systemsafe):warn );
+
 BEGIN
 {
     $SIG{__WARN__} = sub { die $_[0] };
@@ -38,53 +40,21 @@ sub _init_strap
 
 package main;
 
-sub trap_output
 {
-    my $args = shift;
-
-    open ALTOUT, ">", "altout.txt";
-    open SAVEOUT, ">&STDOUT";
-    open STDOUT, ">&ALTOUT";
-
-
-    my $tester = ($args->{class} || "Test::Run::Obj")->new(
-        {@{$args->{args}}},
-        );
-
-    eval { $tester->runtests(); };
-
-    my $error = $@;
-
-    open STDOUT, ">&SAVEOUT";
-    close(SAVEOUT);
-    close(ALTOUT);
-
-    my $text = do { local $/; local *I; open I, "<", "altout.txt"; <I>};
-
-    return
-    {
-        'stdout' => $text,
-        'error' => $error,
-    }
-}
-
-{
-    my $got = trap_output(
-        {
-            class => "MyTestRun",
-            args =>
-            [
+    trap {
+        my $tester = 
+            MyTestRun->new(
                 test_files => 
                 [
                     "t/sample-tests/simple",
                     "t/sample-tests/success1.mok",
                 ],
-            ],
-        }
-    );
+            );
+        $tester->runtests();
+    };
 
     # TEST
-    ok (($got->{error} !~ /sprintf/), 
+    ok ($trap->stderr() !~ /sprintf/, 
         "No warning for undefined sprintf argument was emitted."
     );
 }
