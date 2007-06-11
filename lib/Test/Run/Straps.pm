@@ -46,7 +46,7 @@ my @fields= (qw(
     totals
 ));
 
-sub _get_fields
+sub _get_private_fields
 {
     return [@fields];
 }
@@ -111,12 +111,16 @@ sub _initialize {
     my $self = shift;
     my $args = shift;
 
+    $self->NEXT::_initialize($args);
+
     $self->_is_vms( $^O eq 'VMS' );
     $self->_is_win32( $^O =~ /^(MS)?Win32$/ );
     $self->_is_macos( $^O eq 'MacOS' );
 
     $self->totals(+{});
     $self->todo(+{});
+
+    return 0;
 }
 
 =head1 ANALYSIS

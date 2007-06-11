@@ -3,7 +3,7 @@ package Test::Run::Output;
 use strict;
 use warnings;
 
-use base 'Class::Accessor';
+use base 'Test::Run::Base';
 
 __PACKAGE__->mk_accessors(qw(NoTty Verbose last_test_print ml));
 
@@ -12,31 +12,23 @@ __PACKAGE__->mk_accessors(qw(NoTty Verbose last_test_print ml));
 Test::Run::Output - Base class for outputting messages to the user in a test
 harmess.
 
-=cut
-
-sub new
-{
-    my $class = shift;
-    my $self = {};
-    bless $self, $class;
-    $self->_initialize(@_);
-    return $self;
-}
-
-sub _initialize
-{
-    my $self = shift;
-    my $args = shift;
-    $self->Verbose($args->{Verbose});
-    $self->NoTty($args->{NoTty});
-    return 0;
-}
-
-=head2 METHODS 
+=head1 METHODS
 
 =over 4
 
 =cut
+
+sub _initialize
+{
+    my ($self, $args) = @_;
+
+    $self->NEXT::_initialize($args);
+
+    $self->Verbose($args->{Verbose});
+    $self->NoTty($args->{NoTty});
+
+    return 0;
+}
 
 sub _print_message_raw
 {
@@ -47,9 +39,11 @@ sub _print_message_raw
 sub print_message
 {
     my ($self, $msg) = @_;
+
     $self->_print_message_raw($msg);
     $self->_newline();
 
+    return;
 }
 
 sub _newline
@@ -58,39 +52,85 @@ sub _newline
     $self->_print_message_raw("\n");
 }
 
+sub print_ml
+{
+    my ($self, $msg) = @_;
+
+    if ($self->ml())
+    {
+        $self->_print_message_raw($self->ml . $msg);
+    }
+}
+
 sub print_leader
 {
     my ($self, $args) = @_;
 
-    my ($leader, $ml) =
+    $self->_print_message_raw(
         $self->_mk_leader(
             $args->{filename},
-            $args->{width},
-        );
-
-    $self->ml($ml);
-    $self->_print_message_raw(
-        $leader,
+            $args->{width}
+        )
     );
 }
 
-sub print_ml
+# Print updates only once per second.
+sub print_ml_less
 {
-    my $self = shift;
-    my $msg = shift;
-    if ($self->ml())
+    my ($self, @args) = @_;
+
+    my $now = CORE::time();
+
+    if ($self->last_test_print() != $now)
     {
-        $self->_print_message_raw($self->ml(). $msg);
+        $self->print_ml(@args);
+
+        $self->last_test_print($now);
     }
 }
 
-# Print updates only once per second.
-sub print_ml_less {
+sub _mk_leader__calc_te
+{
+    my ($self, $te) = @_;
+
+    chomp($te);
+
+    $te =~ s{\.\w+$}{.};
+
+    if ($^O eq "VMS")
+    {
+        $te =~ s{^.*\.t\.}{\[.t.}s;
+    }
+
+    return $te;
+}
+
+sub _is_terminal
+{
     my $self = shift;
-    my $now = CORE::time;
-    if ( $self->last_test_print() != $now ) {
-        $self->print_ml(@_);
-        $self->last_test_print($now);
+
+    return ((-t STDOUT) && (! $self->NoTty()) && (! $self->Verbose()));
+}
+
+sub _mk_leader__calc_leader
+{
+    my ($self, $args) = @_;
+
+    my $te = $self->_mk_leader__calc_te($args->{te});
+    return ("$te" . '.' x ($args->{width} - length($te)));
+}
+
+sub _mk_leader__calc_ml
+{
+    my ($self, $args) = @_;
+
+    if (! $self->_is_terminal())
+    {
+        return "";
+    }
+    else
+    {
+        return "\r" . (' ' x 77) . "\r" . $args->{leader};
     }
 }
 
@@ -109,31 +149,29 @@ The C<$width> is the width of the "yada/blah.." string.
 
 sub _mk_leader
 {
-    my ($self, $te, $width) = @_;
-    chomp($te);
-    $te =~ s/\.\w+$/./;
+    my ($self, $_pre_te, $width) = @_;
 
-    if ($^O eq 'VMS') {
-        $te =~ s/^.*\.t\./\[.t./s;
-    }
-    my $leader = "$te" . '.' x ($width - length($te));
-    my $ml = "";
+    my $leader = $self->_mk_leader__calc_leader(
+        +{ te => $_pre_te, width => $width, }
+    );
 
-    if ( -t STDOUT and not $self->NoTty() and not $self->Verbose())
-    {
-        $ml = "\r" . (' ' x 77) . "\r$leader";
-    }
+    $self->ml(
+        $self->_mk_leader__calc_ml(
+            { leader => $leader, width => $width, },
+        )
+    );
 
-    return($leader, $ml);
+    return $leader;
 }
 
 =back
 
-=head1 AUTHOR
+=head1 LICENSE
 
-Shlomi Fish (shlomif@iglu.org.il)
+This file is licensed under the MIT X11 License:
+
+http://www.opensource.org/licenses/mit-license.php
 
 =cut
 
 1;
-

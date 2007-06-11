@@ -1,33 +1,39 @@
 ---
 name: Test-Run
-version: 0.0109
-author:
-  - 'Shlomi Fish C<< <shlomif@iglu.org.il> >>'
-abstract: Run Perl standard test scripts with statistics
+version: 0.0110
+author: []
+abstract: Base class to run standard TAP scripts.
 license: perl
 resources:
   license: http://dev.perl.org/licenses/
 requires:
   Class::Accessor: 0
   File::Spec: 0.6
+  List::MoreUtils: 0
   List::Util: 0
   NEXT: 0
   Scalar::Util: 0
   TAP::Parser: 0.51
   Test::Harness: 2.53
+  Test::Trap: 0
+  Text::Sprintf::Named: 0.02
 build_requires:
   Test::Trap: 0
 provides:
   Test::Run::Assert:
     file: lib/Test/Run/Assert.pm
-    version: 0.02
+    version: 0.03
   Test::Run::Base:
     file: lib/Test/Run/Base.pm
   Test::Run::Base::Struct:
     file: lib/Test/Run/Base/Struct.pm
+  Test::Run::Class::Hierarchy:
+    file: lib/Test/Run/Class/Hierarchy.pm
   Test::Run::Core:
     file: lib/Test/Run/Core.pm
-    version: 0.0109
+    version: 0.0110
+  Test::Run::Core_GplArt:
+    file: lib/Test/Run/Core_GplArt.pm
   Test::Run::Iface:
     file: lib/Test/Run/Iface.pm
   Test::Run::Obj:
@@ -57,6 +63,8 @@ provides:
     file: lib/Test/Run/Output.pm
   Test::Run::Plugin::CmdLine::Output:
     file: lib/Test/Run/Plugin/CmdLine/Output.pm
+  Test::Run::Sprintf::Named::FromAccessors:
+    file: lib/Test/Run/Sprintf/Named/FromAccessors.pm
   Test::Run::Straps:
     file: lib/Test/Run/Straps.pm
     version: 0.25
@@ -64,7 +72,9 @@ provides:
     file: lib/Test/Run/Straps/StrapsDetailsObj.pm
   Test::Run::Straps::StrapsTotalsObj:
     file: lib/Test/Run/Straps/StrapsTotalsObj.pm
-generated_by: Module::Build version 0.2806
+  Test::Run::Trap::Obj:
+    file: lib/Test/Run/Trap/Obj.pm
+generated_by: Module::Build version 0.2805
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
   version: 1.2

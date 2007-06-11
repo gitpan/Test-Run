@@ -7,19 +7,21 @@ use Carp;
 use Benchmark qw(timestr);
 use NEXT;
 
-use Test::Run::Core;
+use base 'Test::Run::Core';
 
-=head1 Test::Run::Plugin::CmdLine::Output
+=head1 NAME
 
-This a module that implements the command line/STDOUT specific output of 
-L<Test::Run::Obj>, which was taken out of L<Test::Run::Core> to increase
-modularity.
+Test::Run::Plugin::CmdLine::Output - the default output plugin for
+Test::Run::CmdLine.
+
+=head1 MOTIVATION
+
+This class has gradually re-implemented all of the 
+L<Test::Run::Plugin::CmdLine::Output::GplArt> functionality to 
+avoid license complications. 
 
 =cut
 
-use vars qw(@ISA);
-
-@ISA=(qw(Test::Run::Core));
 
 __PACKAGE__->mk_accessors(qw(
     output
@@ -27,29 +29,90 @@ __PACKAGE__->mk_accessors(qw(
 
 sub _get_new_output
 {
-    my $self = shift;
-    my $args = shift;
+    my ($self, $args) = @_;
 
-    return Test::Run::Output->new(
-        $args,
-    );
+    return Test::Run::Output->new($args);
+}
+
+sub _print
+{
+    my ($self, $string) = @_;
+
+    return $self->output()->print_message($string);
+}
+
+sub _named_printf
+{
+    my ($self, $format, $args) = @_;
+
+    return
+        $self->_print(
+            $self->_format($format, $args),
+        );
 }
 
 sub _initialize
 {
     my $self = shift;
 
+    $self->NEXT::_initialize(@_);
+
     my ($args) = @_;
 
     $self->output($self->_get_new_output($args));
+    $self->_formatters({});
+    {
+        my %formatters =
+        (
+            "dubious_status" =>
+                "Test returned status %(estatus)s (wstat %(wstatus)d, 0x%(wstatus)x)",
+            "vms_status" =>
+                "\t\t(VMS status is %(estatus)s)",
+            "test_file_closing_error" =>
+                "can't close %(file)s. %(error)s",
+            "could_not_run_script" =>
+                "can't run %(file)s. %(error)s",
+            "test_file_opening_error" =>
+                "can't open %(file)s. %(error)s",
+            "premature_test_dubious_summary" =>
+                "DIED. %(canonfailed)s",
+            "report_skipped_test" =>
+                "%(ml)sok%(elapsed)s\n        %(all_skipped_test_msgs)s",
+            "report_all_ok_test" =>
+                "%(ml)sok%(elapsed)s",
+            "start_env" =>
+                "# PERL5LIB=%(p5lib)s",
+        );
 
-    return $self->NEXT::_initialize(@_);
+        while (my ($id, $format) = each(%formatters))
+        {
+            $self->_register_formatter($id, $format);
+        }
+    }
+
+    {
+        my %obj_formatters =
+        (
+            "skipped_msg" =>
+                "%(skipped)s/%(max)s skipped: %(skip_reason)s",
+            "bonus_msg" =>
+                "%(bonus)s/%(max)s unexpectedly succeeded",
+            "report_final_stats" =>
+                "Files=%(files)d, Tests=%(max)d, %(bench_timestr)s",
+        );
+
+        while (my ($id, $format) = each(%obj_formatters))
+        {
+            $self->_register_obj_formatter($id, $format);
+        }
+    }
+
+    return 0;
 }
 
 sub _get_dubious_message_ml
 {
     my $self = shift;
-
     return $self->last_test_obj->ml();
 }
 
@@ -58,12 +121,28 @@ sub _get_dubious_verdict_message
     return "dubious";
 }
 
-sub _get_dubious_status_message
+sub _get_callbacks_list_for_dubious_message
 {
     my $self = shift;
-    
-    return "Test returned status " . $self->_get_estatus() . " "
-        . sprintf("(wstat %d, 0x%x)", ($self->_get_wstatus()) x 2);
+
+    return [qw(
+        _get_dubious_message_ml
+        _get_dubious_verdict_message
+        _get_dubious_message_line_end
+        _get_dubious_status_message_indent_prefix
+        _get_dubious_status_message
+    )];
+}
+
+sub _get_dubious_message_components
+{
+    my $self = shift;
+
+    return 
+    [ 
+        map { my $cb = $_; $self->$cb() } 
+        @{$self->_get_callbacks_list_for_dubious_message()}
+    ];
 }
 
 sub _get_dubious_message_line_end
@@ -76,18 +155,16 @@ sub _get_dubious_status_message_indent_prefix
     return "\t";
 }
 
-sub _get_dubious_message_components
+sub _get_dubious_status_message
 {
     my $self = shift;
 
-    return 
-    [
-           $self->_get_dubious_message_ml()
-        ,  $self->_get_dubious_verdict_message()
-        ,  $self->_get_dubious_message_line_end() 
-        ,  $self->_get_dubious_status_message_indent_prefix()
-        ,  $self->_get_dubious_status_message()
-    ];
+    return $self->_format("dubious_status",
+        {
+            estatus => $self->_get_estatus(),
+            wstatus => $self->_get_wstatus(),
+        }
+    );
 }
 
 sub _get_dubious_message
@@ -99,75 +176,116 @@ sub _get_dubious_message
     );
 }
 
+sub _report_dubious_summary_all_subtests_successful
+{
+    my $self = shift;
+
+    $self->_print("\tafter all the subtests complete successfully");
+}
+
 sub _vms_specific_report_dubious
 {
     my ($self) = @_;
-    my $estatus = $self->_get_estatus();
-    
+
     if ($^O eq "VMS")
     {
-        $self->output()->print_message("\t\t(VMS status is $estatus)");
+        $self->_named_printf(
+            "vms_status",
+            { estatus => $self->_get_estatus() },
+        );
     }
 }
 
 sub _report_dubious
 {
     my ($self) = @_;
-    my $estatus = $self->_get_estatus();
 
-    $self->output()->print_message(
-        $self->_get_dubious_message()
-        );
-
+    $self->_print($self->_get_dubious_message());
     $self->_vms_specific_report_dubious();
+}
+
+sub _get_leaked_files_string
+{
+    my ($self, $args) = @_;
+
+    return join(" ", sort @{$args->{leaked_files}});
 }
 
 sub _report_leaked_files
 {
-    my ($self, $args) = (@_);
+    my ($self, $args) = @_;
+    
+    $self->_print("LEAKED FILES: " . $self->_get_leaked_files_string($args));
+}
 
-    my @f = sort @{$args->{leaked_files}};
+sub _handle_test_file_closing_error
+{
+    my ($self, $args) = @_;
 
-    $self->output()->print_message("LEAKED FILES: @f");
+    return $self->_named_printf(
+        "test_file_closing_error",
+        $args,
+    );
+}
+
+sub _report_could_not_run_script
+{
+    my ($self, $args) = @_;
+
+    return $self->_named_printf(
+        "could_not_run_script",
+        $args,
+    );
+}
+
+sub _handle_test_file_opening_error
+{
+    my ($self, $args) = @_;
+
+    return $self->_named_printf(
+        "test_file_opening_error",
+        $args,
+    );
+}
+
+sub _get_defined_skipped_msgs
+{
+    my ($self, $args) = @_;
+
+    return $self->_format("skipped_msg", { obj => $self->last_test_obj});
 }
 
 sub _get_skipped_msgs
 {
-    my ($self) = @_;
+    my ($self, $args) = @_;
 
-    my $test = $self->last_test_obj();
-
-    if ($test->skipped())
+    if ($self->last_test_obj->skipped())
     {
-        return 
-        [
-            ($test->skipped()."/".$test->max()." skipped: ".
-            $test->skip_reason())
-        ];
+        return [ $self->_get_defined_skipped_msgs() ];
     }
     else
     {
         return [];
     }
+}
+
+sub _get_defined_bonus_msg
+{
+    my ($self, $args) = @_;
+
+    return $self->_format("bonus_msg", { obj => $self->last_test_obj() });
 }
 
 sub _get_bonus_msgs
 {
     my ($self, $args) = @_;
 
-    my $test = $self->last_test_obj;
-
-    if ($test->bonus())
-    {
-        return
-        [
-            ($test->bonus()."/".$test->max()." unexpectedly succeeded")
-        ];
-    }
-    else
-    {
-        return [];
-    };
+    return
+    [
+        ($self->last_test_obj->bonus()) ?
+            $self->_get_defined_bonus_msg() :
+            ()
+    ];
 }
 
 sub _get_all_skipped_test_msgs
@@ -180,16 +298,89 @@ sub _get_all_skipped_test_msgs
     ];
 }
 
+sub _report_single_test_file_start_leader
+{
+    my ($self, $args) = @_;
+
+    $self->output()->last_test_print(0);
+    $self->output()->print_leader(
+        {
+            filename => $args->{test_file},
+            width => $self->width(),
+        }
+    );
+}
+
+sub _report_single_test_file_start_debug
+{
+    my ($self, $args) = @_;
+
+    if ($self->Debug())
+    {
+        $self->_print(
+            "# Running: " . $self->Strap()->_command_line($args->{test_file})
+        );
+    }
+}
+
+sub _report_single_test_file_start
+{
+    my ($self, $args) = @_;
+
+    $self->_report_single_test_file_start_leader($args);
+
+    $self->_report_single_test_file_start_debug($args);
+
+    return;
+}
+
+sub _calc_test_struct_ml
+{
+    my $self = shift;
+
+    return $self->output->ml;
+}
+
+
+sub _report_premature_test_dubious_summary
+{
+    my $self = shift;
+
+    $self->_named_printf(
+        "premature_test_dubious_summary",
+        {
+            canonfailed => $self->_ser_failed_results(),
+        }
+    );
+
+    return;
+}
+
 sub _report_skipped_test
 {
-    my ($self) = @_;
+    my $self = shift;
 
-    my $test = $self->last_test_obj();
-    my $elapsed = $self->last_test_elapsed();
+    $self->_named_printf(
+        "report_skipped_test",
+        {
+            ml => $self->last_test_obj->ml(),
+            elapsed => $self->last_test_elapsed,
+            all_skipped_test_msgs =>
+                join(', ', @{$self->_get_all_skipped_test_msgs()}),
+        }
+    );
+}
 
-    $self->output()->print_message(
-        $test->ml()."ok$elapsed\n        ".
-        join(', ', @{$self->_get_all_skipped_test_msgs()})
+sub _report_all_ok_test
+{
+    my ($self, $args) = @_;
+
+    $self->_named_printf(
+        "report_all_ok_test",
+        {
+            ml => $self->last_test_obj->ml(),
+            elapsed => $self->last_test_elapsed,
+        }
     );
 }
 
@@ -197,114 +388,67 @@ sub _report_failed_before_any_test_output
 {
     my $self = shift;
 
-    $self->output()->print_message("FAILED before any test output arrived");
-}
-
-sub _report_all_ok_test
-{
-    my ($self, $args) = @_;
-
-    my $test = $self->last_test_obj;
-    my $elapsed = $self->last_test_elapsed;
-
-    $self->output()->print_message($test->ml()."ok$elapsed");
-
-    return;
+    $self->_print("FAILED before any test output arrived");
 }
 
 sub _report_all_skipped_test
 {
     my ($self, $args) = @_;
 
-    my $test = $self->last_test_obj;
-
-    $self->output()->print_message(
-        "skipped\n        all skipped: " . $test->get_reason()
-        );
+    $self->_print(
+        "skipped\n        all skipped: "
+        . $self->last_test_obj->get_reason()
+    );
 }
 
-sub _fail_other_print_bonus_message
+sub _namelenize_string
 {
-    my $self = shift;
+    my ($self, $string) = @_;
     
-    my $bonusmsg = $self->_bonusmsg() || "";
-    $bonusmsg =~ s/^,\s*//;
-    if ($bonusmsg)
-    {
-        $self->output()->print_message("$bonusmsg.");
-    }
+    $string =~ s{\${max_namelen}}{$self->max_namelen()}ge;
+
+    return $string;
 }
 
-sub _report_failed_with_results_seen
+sub _obj_named_printf
 {
-    my ($self) = @_;
+    my ($self, $string, $obj) = @_;
 
-    $self->output()->print_message(
-        $self->_get_failed_with_results_seen_msg(),
+    return
+    $self->_print(
+        $self->_get_obj_formatter(
+            $self->_namelenize_string(
+                $string,
+            ),
+        )->obj_format($obj)
     );
 }
 
-sub _report_single_test_file_start
+sub _fail_other_report_tests_print_summary
 {
     my ($self, $args) = @_;
 
-    $self->output()->last_test_print(0); # so each test prints at least once
-    $self->output()->print_leader({
-        filename => $args->{test_file},
-        width => $self->width(),
-    });
-
-    if ( $self->Debug() )
-    {
-        $self->output()->print_message(
-            "# Running: " . $self->Strap()->_command_line($args->{test_file})
-        );
-    }
-
-    return;
-}
-
-sub _report
-{
-    my ($self, $args) = @_;
-    my $event = $args->{'event'};
-    my $msg;
-    if ($event->{type} eq "success")
-    {
-        $msg = $self->_get_success_msg();
-    }
-    else
-    {
-        confess "Unknown \$event->{type} passed to _report!";
-    }
-
-    return $self->output()->print_message($msg);
-}
-
-sub _fail_other_print_top
-{
-    my $self = shift;
-
-    my $max_namelen = $self->max_namelen();
-
-    $self->output()->print_message(
-        sprintf("%-${max_namelen}s", $self->_get_format_failed_str()) .
-        $self->_get_format_middle_str() .
-        $self->_get_format_list_str()
+    return $self->_obj_named_printf(
+        ( "%(name)-\${max_namelen}s  "
+        . "%(estat)3s %(wstat)5s %(max)5s %(failed)4s "
+        . "%(_defined_percent)6.2f%%  %(first_canon_string)s"
+        ),
+        $args->{test},
     );
-    $self->output()->print_message("-" x $self->format_columns());
 }
 
-sub _report_final_stats
+sub _fail_other_report_test_print_rest_of_canons
 {
-    my ($self) = @_;
+    my ($self, $args) = @_;
 
-    my $tot = $self->tot();
+    my $test = $args->{test};
 
-    $self->output()->print_message(
-        sprintf("Files=%d, Tests=%d, %s",
-           $tot->files(), $tot->max(), timestr($tot->bench(), 'nop'))
-       );
+    my $whitespace = (" " x ($self->format_columns() - $self->list_len()));
+
+    foreach my $canon (@{$test->rest_of_canons()})
+    {
+        $self->_print($whitespace.$canon);
+    }
 }
 
 sub _fail_other_report_test
@@ -313,147 +457,190 @@ sub _fail_other_report_test
     my $script = shift;
 
     my $test = $self->failed_tests()->{$script};
-    my $max_namelen = $self->max_namelen();
-    my $list_len = $self->list_len();
 
-    my @canon = split(/\s+/, $test->canon());
+    $test->_assign_canon_strings({ main => $self, });
 
-    my $canon_strings = $self->_fail_other_get_canon_strings([@canon]);
-    
-    $self->output()->print_message(
-        sprintf(
-            ("%-" . $max_namelen . "s  " . 
-                "%3s %5s %5s %4s %6.2f%%  %s"),
-            $test->name(), $test->estat(),
-            $test->wstat(), $test->max(),
-            $test->failed(), $test->_defined_percent(),
-            shift(@$canon_strings)
-        )
-    );
-    foreach my $c (@$canon_strings)
+    my $args_to_pass =
     {
-        $self->output()->print_message(
-            sprintf((" " x ($self->format_columns() - $list_len) . 
-                "%s"),
-                $c
-            ),
-        );
-    }
+        test => $test,
+        script => $script,
+    };
+    
+    $self->_fail_other_report_tests_print_summary($args_to_pass);
+
+    $self->_fail_other_report_test_print_rest_of_canons($args_to_pass);
 }
 
-sub _report_dubious_summary_all_subtests_successful
-{
-    my ($self) = @_;
-
-    $self->output()->print_message("\tafter all the subtests completed successfully");
-}
-
-sub _report_premature_test_dubious_summary
-{
-    my ($self) = @_;
-
-    my ($txt) = $self->_canonfailed();
-
-    $self->output()->print_message("DIED. " . $txt);
-}
-
-sub _calc_test_struct_ml
+sub _calc_fail_other_bonus_message
 {
     my $self = shift;
 
-    return $self->output()->ml();
+    my $message = $self->_bonusmsg() || "";
+    $message =~ s{\A,\s*}{};
+    
+    return $message ? "$message." : "";
 }
 
-sub _report_tap_event
+sub _fail_other_print_bonus_message
+{
+    my $self = shift;
+
+    if (my $bonusmsg = $self->_calc_fail_other_bonus_message())
+    {
+        $self->_print($bonusmsg);
+    }
+}
+
+sub _report_failed_with_results_seen
+{
+    my ($self) = @_;
+
+    $self->_print($self->_get_failed_with_results_seen_msg());
+}
+
+sub _report_test_progress__verdict
 {
     my ($self, $args) = @_;
-    
-    my $raw_event = $args->{'raw_event'};
 
-    if ($self->Verbose())
+    my $totals = $args->{totals};
+
+    if ($totals->last_detail->ok)
     {
-        chomp($raw_event);
-        $self->output()->print_message($raw_event);
+        $self->output->print_ml_less(
+            "ok ". $totals->seen . "/" . $totals->max
+        );
+    }
+    else
+    {
+        $self->output->print_ml("NOK " . $totals->seen);
+    }
+}
+
+sub _report_test_progress__counter
+{
+    my ($self, $args) = @_;
+
+    my $totals = $args->{totals};
+
+    my $curr = $totals->seen;
+    my $next = $self->Strap->next();
+
+    if ($curr > $next)
+    {
+        $self->_print("Test output counter mismatch [test $curr]");
+    }
+    elsif ($curr < $next)
+    {
+        $self->_print(
+            "Confused test output: test $curr answered after test @{[$next-1]}",
+        );
     }
 }
 
 sub _report_test_progress
 {
     my ($self, $args) = @_;
+    $self->_report_test_progress__verdict($args);
+    $self->_report_test_progress__counter($args);
+}
 
-    my $totals = $args->{totals};
+sub _report_tap_event
+{
+    my ($self, $args) = @_;
 
-    my $curr = $totals->seen();
-    my $next = $self->Strap()->next();
-    my $max  = $totals->max();
-    my $detail = $totals->last_detail;
+    my $raw_event = $args->{event}->raw();
+    if ($self->Verbose())
+    {
+        chomp($raw_event);
+        $self->_print($raw_event);
+    }
+}
 
-    if ( $detail->ok() )
-    {
-        $self->output()->print_ml_less("ok $curr/$max");
-    }
-    else
-    {
-        $self->output()->print_ml("NOK $curr");
-    }
+sub _calc_PERL5LIB
+{
+    my $self = shift;
 
-    if ($curr > $next) 
-    {
-        $self->output()->print_message("Test output counter mismatch [test $curr]");
-    }
-    elsif ($curr < $next)
-    {
-        $self->output()->print_message(
-            "Confused test output: test $curr answered after test " . 
-            ($next - 1)
-        );
-    }
+    return
+        +(exists($ENV{PERL5LIB}) && defined($ENV{PERL5LIB}))
+            ? $ENV{PERL5LIB}
+            : ""
+        ;
 }
 
 sub _report_script_start_environment
 {
     my $self = shift;
 
-    if ( $self->Debug() )
+    if ($self->Debug())
     {
-        my $perl5lib = 
-            ((exists($ENV{PERL5LIB}) && defined($ENV{PERL5LIB})) ?
-                $ENV{PERL5LIB} :
-                ""
-            );
-
-        $self->output()->print_message("# PERL5LIB=$perl5lib");
+        $self->_named_printf(
+            "start_env",
+            { 'p5lib' => $self->_calc_PERL5LIB()},
+        );
     }
 }
 
-sub _report_could_not_run_script
+sub _report_final_stats
+{
+    my $self = shift;
+
+    return $self->_named_printf(
+        "report_final_stats",
+        { obj => $self->tot() },
+    );
+}
+
+sub _report_success_event
 {
     my ($self, $args) = @_;
 
-    my $file = $args->{file};
-    my $error = $args->{error};
-
-    $self->output()->print_message("can't run $file. $error");
+    $self->_print($self->_get_success_msg());
 }
 
-sub _handle_test_file_opening_error
+sub _report_non_success_event
 {
     my ($self, $args) = @_;
 
-    my $file = $args->{file};
-    my $error = $args->{error};
-
-    $self->output()->print_message("can't open $file. $error");
+    confess "Unknown \$event->{type} passed to _report!";
 }
 
-sub _handle_test_file_closing_error
+sub _report
 {
     my ($self, $args) = @_;
 
-    my $file = $args->{file};
-    my $error = $args->{error};
+    my $event = $args->{event};
 
-    $self->output()->print_message("can't close $file. $error");
+    if ($event->{type} eq "success")
+    {
+        return $self->_report_success_event($args);
+    }
+    else
+    {
+        return $self->_report_non_success_event($args);
+    }
 }
+
+sub _fail_other_print_top
+{
+    my $self = shift;
+
+    $self->_named_printf(
+        \("%(failed)-" . $self->max_namelen() . "s%(middle)s%(list)s") ,
+        { 
+            failed => $self->_get_format_failed_str(),
+            middle => $self->_get_format_middle_str(),
+            list =>   $self->_get_format_list_str(),
+        }
+    );
+    
+    $self->_print("-" x $self->format_columns());
+}
+
+=head1 LICENSE
+
+This code is licensed under the MIT X11 License.
+
+=cut
 
 1;
+

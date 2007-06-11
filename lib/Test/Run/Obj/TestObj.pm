@@ -10,6 +10,8 @@ use vars qw(@fields);
 
 use base 'Test::Run::Base::Struct';
 
+use NEXT;
+
 @fields = (qw(
     ok
     next
@@ -59,12 +61,28 @@ The skip reason for the last skipped test that specified such a reason.
 
 =cut
 
-sub _get_fields
+sub _get_private_fields
 {
     return [@fields];
 }
 
 __PACKAGE__->mk_accessors(@fields);
+
+sub _initialize
+{
+    my ($self, $args) = @_;
+
+    $self->NEXT::_initialize($args);
+
+    $self->_formatters($self->_formatters() || {});
+
+    $self->_register_obj_formatter(
+        "dont_know_which_tests_failed",
+        "Don't know which tests failed: got %(ok)s ok, expected %(max)s",
+    );
+
+    return 0;
+}
 
 =head1 $self->add_to_failed(@failures)
 
@@ -98,6 +116,41 @@ sub get_reason
             $self->skip_all() :
             $self->_get_reason_default()
         ;
+}
+
+sub num_failed
+{
+    my $self = shift;
+
+    return scalar(@{$self->failed()});
+}
+
+sub calc_percent
+{
+    my $self = shift;
+
+    return ( (100*$self->num_failed()) / $self->max() );
+}
+
+sub add_next_to_failed
+{
+    my $self = shift;
+
+    return $self->add_to_failed($self->next() .. $self->max());
+}
+
+sub is_failed_and_max
+{
+    my $self = shift;
+
+    return scalar(@{$self->failed()}) && $self->max();
+}
+
+sub _get_dont_know_which_tests_failed_msg
+{
+    my $self = shift;
+
+    return $self->_format_self("dont_know_which_tests_failed");
 }
 
 1;

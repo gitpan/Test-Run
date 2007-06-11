@@ -1,12 +1,28 @@
+=head1 NAME
+
+Test::Run::Obj::Error - an error class hierarchy for Test::Run.
+
+=head1 DESCRIPTION
+
+This module provides an error class hieararchy for Test::Run. This is used
+for throwing exceptions that should be handled programatically.
+
+=head1 METHODS 
+=cut
+
+
+package Test::Run::Obj::Error;
 
 use strict;
 use warnings;
 
 use Test::Run::Base::Struct;
 
-package Test::Run::Obj::Error;
+use Scalar::Util ();
 
 use vars qw(@ISA @fields);
+
+use NEXT;
 
 sub _polymorphic_stringify
 {
@@ -28,21 +44,27 @@ use overload
     text
 ));
 
-sub _get_fields
+sub _get_private_fields
 {
     return [@fields];
 }
 
 __PACKAGE__->mk_accessors(@fields);
 
-sub initialize
+sub _initialize
 {
     my $self = shift;
+
+    # Workaround to make NEXT:: behave.
+    # It misbehaves upon a stringification operation.
+    $self->text(Scalar::Util::refaddr($self));
+
+    $self->NEXT::_initialize(@_);
+
     my ($pkg,$file,$line) = caller(1);
     $self->package($pkg);
     $self->file($file);
     $self->line($line);
-    return $self->SUPER::initialize(@_);
 }
 
 =head2 $self->stringify()
@@ -87,11 +109,11 @@ package Test::Run::Obj::Error::TestsFail::Bailout;
 
 use vars qw(@ISA @fields);
 
-sub _get_fields
+sub _get_private_fields
 {
     my $self = shift;
 
-    return [@{$self->SUPER::_get_fields()}, @fields];
+    return [@fields];
 }
 
 @ISA = (qw(Test::Run::Obj::Error::TestsFail));
@@ -111,4 +133,12 @@ sub stringify
 }
 
 1;
+
+=head1 LICENSE
+
+This file is licensed under the MIT X11 License:
+
+http://www.opensource.org/licenses/mit-license.php
+
+=cut
 
