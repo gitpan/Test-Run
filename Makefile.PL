@@ -17,6 +17,7 @@ WriteMakefile
                            'NEXT' => 0,
                            'Text::Sprintf::Named' => '0.02',
                            'List::Util' => 0,
+                           'UNIVERSAL::require' => 0,
                            'List::MoreUtils' => 0
                          }
         )

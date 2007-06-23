@@ -14,7 +14,7 @@ use Fatal qw(opendir);
 use Time::HiRes ();
 use List::Util ();
 
-use Test::Run::Obj::CanonFailedObj;
+use File::Spec;
 
 =head1 NAME
 
@@ -22,11 +22,11 @@ Test::Run::Core - Base class to run standard TAP scripts.
 
 =head1 VERSION
 
-Version 0.0110
+Version 0.0111
 
 =cut
 
-$VERSION = '0.0110';
+$VERSION = '0.0111';
 
 $ENV{HARNESS_ACTIVE} = 1;
 $ENV{HARNESS_NG_VERSION} = $VERSION;
@@ -71,6 +71,7 @@ sub _get_private_simple_params
 __PACKAGE__->mk_accessors(qw(
     _bonusmsg
     dir_files
+    _new_dir_files
     failed_tests
     format_columns
     last_test_elapsed
@@ -119,7 +120,47 @@ sub _initialize
         $self->_get_new_strap($args),
     );
 
+    $self->register_pluggable_helper(
+        {
+            id => "failed",
+            base => "Test::Run::Obj::FailedObj",
+            collect_plugins_method => "private_failed_obj_plugins",
+        },
+    );
+
+    $self->register_pluggable_helper(
+        {
+            id => "test",
+            base => "Test::Run::Obj::TestObj",
+            collect_plugins_method => "private_test_obj_plugins",
+        },
+    );
+
+    $self->register_pluggable_helper(
+        {
+            id => "tot",
+            base => "Test::Run::Obj::TotObj",
+            collect_plugins_method => "private_tot_obj_plugins",
+        },
+    );
+
+    $self->register_pluggable_helper(
+        {
+            id => "canon_failed",
+            base => "Test::Run::Obj::CanonFailedObj",
+            collect_plugins_method => "private_canon_failed_obj_plugins",
+        },
+    );
+
+
     return 0;
+}
+
+sub helpers_base_namespace
+{
+    my $self = shift;
+
+    return "Test::Run::Core::__HelperObjects";
 }
 
 =head2 Object Parameters
@@ -257,6 +298,61 @@ The results of the test.
 
 =cut
 
+=head2 $self->_recheck_dir_files()
+
+Called to recheck that the dir files is OK.
+
+=cut
+
+sub _recheck_dir_files
+{
+    my $self = shift;
+
+    if (defined($self->Leaked_Dir()))
+    {
+        return $self->_real_recheck_dir_files();
+    }
+}
+
+sub _calc_leaked_files_since_last_update
+{
+    my $self = shift;
+   
+    my %found;
+
+    @found{@{$self->_dir_files()}} = (1) x @{$self->_dir_files()};
+    
+    delete(@found{@{$self->_new_dir_files()}});
+
+    return [sort keys(%found)];
+}
+
+sub _real_recheck_dir_files
+{
+    my $self = shift;
+
+    $self->_new_dir_files($self->_get_dir_files());
+    
+    $self->_report_leaked_files(
+        { 
+            leaked => $self->_calc_leaked_files_since_last_update()
+        }
+    );
+    $self->_update_dir_files();
+}
+
+sub _update_dir_files
+{
+    my $self = shift;
+
+    $self->dir_files($self->_new_dir_files());
+
+    # Reset it to prevent dangerous behaviour.
+    $self->_new_dir_files(undef);
+
+    return;
+}
+
 sub _glob_dir
 {
     my ($self, $dirname) = @_;
@@ -266,14 +362,31 @@ sub _glob_dir
     my @contents = readdir($dir);
     closedir($dir);
 
-    return \@contents;
+    return [File::Spec->no_upwards(@contents)];
+}
+
+sub _get_num_tests_files
+{
+    my $self = shift;
+
+    return scalar(@{$self->test_files()});
+}
+
+sub _get_tot_counter_tests
+{
+    my $self = shift;
+
+    return [ tests => $self->_get_num_tests_files() ];
 }
 
 sub _init_tot_obj_instance
 {
     my $self = shift;
-    return Test::Run::Obj::TotObj->new(
-        { @{$self->_get_tot_counter_tests()} },
+    return $self->create_pluggable_helper_obj(
+        {
+            id => "tot",
+            args => { @{$self->_get_tot_counter_tests()} },
+        }
     );
 }
 
@@ -310,15 +423,23 @@ sub _create_failed_obj_instance
 {
     my $self = shift;
     my $args = shift;
-    return Test::Run::Obj::FailedObj->new(
-        $args
+    return $self->create_pluggable_helper_obj(
+        {
+            id => "failed",
+            args => $args,
+        }
     );
 }
 
 sub _create_test_obj_instance
 {
     my ($self, $args) = @_;
-    return Test::Run::Obj::TestObj->new($args);
+    return $self->create_pluggable_helper_obj(
+        {
+            id => "test",
+            args => $args,
+        }
+    );
 }
 
 sub _is_failed_and_max
@@ -466,6 +587,17 @@ sub _set_start_time
     {
         $self->_start_time($self->_get_current_time());
     }
+}
+
+sub _get_failed_with_results_seen_msg
+{
+    my $self = shift;
+
+    return
+        $self->_is_failed_and_max()
+            ? $self->_get_failed_and_max_msg()
+            : $self->_get_dont_know_which_tests_failed_msg()
+            ;
 }
 
 sub _get_dont_know_which_tests_failed_msg
@@ -625,8 +757,8 @@ sub _get_failed_and_max_msg
 {
     my $self = shift;
 
-    return $self->last_test_obj->ml()
-        .  $self->_ser_failed_results();
+    return   $self->last_test_obj->ml()
+           . $self->_ser_failed_results();
 }
 
 sub _canonfailed
@@ -860,6 +992,13 @@ sub _is_last_test_seen
     return shift->last_test_results->seen;
 }
 
+sub _is_test_passing
+{
+    my $self = shift;
+
+    return $self->last_test_results->passing;
+}
+
 sub _get_failed_and_max_params
 {
     my $self = shift;
@@ -1006,7 +1145,12 @@ sub _create_canonfailed_obj_instance
 {
     my ($self, $args) = @_;
 
-    return Test::Run::Obj::CanonFailedObj->new($args);
+    return $self->create_pluggable_helper_obj(
+        {
+            id => "canon_failed",
+            args => $args,
+        }
+    );
 }
 
 sub _canonfailed_get_canon
@@ -1068,6 +1212,88 @@ sub runtests
     {
         return $ok;
     }
+}
+
+sub _get_bonusmsg
+{
+    my $self = shift;
+
+    if (! defined($self->_bonusmsg()))
+    {
+        $self->_bonusmsg($self->tot()->get_bonusmsg());
+    }
+
+    return $self->_bonusmsg();
+}
+
+sub _autoflush_file_handles
+{
+    my $self = shift;
+
+    STDOUT->autoflush(1);
+    STDERR->autoflush(1);
+}
+
+sub _init_failed_tests
+{
+    my $self = shift;
+
+    $self->failed_tests({});
+}
+
+sub _prepare_run_all_tests
+{
+    my $self = shift;
+
+    $self->_autoflush_file_handles();
+
+    $self->_init_failed_tests();
+
+    $self->_init_tot();
+
+    $self->_init_dir_files();
+}
+
+sub _run_all_tests_loop
+{
+    my $self = shift;
+
+    foreach my $test_file_path (@{$self->test_files()})
+    {
+        $self->_run_single_test({ test_file => $test_file_path});
+    }
+}
+
+sub _run_all_tests__run_loop
+{
+    my $self = shift;
+
+    $self->tot->benchmark_callback(
+        sub {
+            $self->width($self->_leader_width());
+            $self->_run_all_tests_loop();
+        }
+    );
+}
+
+sub _finalize_run_all_tests
+{
+    my $self = shift;
+
+    $self->Strap()->_restore_PERL5LIB();
+}
+
+sub _run_all_tests {
+    my $self = shift;
+
+    $self->_prepare_run_all_tests();
+
+    $self->_run_all_tests__run_loop();
+
+    $self->_finalize_run_all_tests();
+
+    # TODO: Eliminate this? -- Shlomi Fish
+    return $self->failed_tests();
 }
 
 =head2 $self->_report_failed_before_any_test_output();

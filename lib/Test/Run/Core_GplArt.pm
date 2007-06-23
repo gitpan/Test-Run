@@ -5,12 +5,7 @@ package Test::Run::Core_GplArt;
 require 5.00405;
 use Test::Run::Straps;
 use Test::Run::Output;
-use Test::Run::Base;
 use Test::Run::Assert;
-
-use Test::Run::Obj::FailedObj;
-use Test::Run::Obj::TestObj;
-use Test::Run::Obj::TotObj;
 
 use Test::Run::Obj::Error;
 
@@ -22,17 +17,12 @@ use Class::Accessor;
 
 use Scalar::Util ();
 use List::Util qw(max);
-use vars qw(
-    @ISA
-);
+
+use base 'Test::Run::Base::PlugHelpers';
 
 =head1 NAME
 
 Test::Run::Core_GplArt - GPL/Artistic-licensed code of Test::Run::Core.
-
-=cut
-
-@ISA = ('Test::Run::Base');
 
 =head1 SYNOPSIS
 
@@ -238,34 +228,6 @@ sub _init_dir_files
     }  
 }
 
-
-sub _recheck_dir_files
-{
-    my $self = shift;
-    
-    if (defined $self->Leaked_Dir()) {
-        my $new_dir_files = $self->_get_dir_files();
-        if (@$new_dir_files != @{$self->dir_files()}) {
-            my %f;
-            @f{@$new_dir_files} = (1) x @$new_dir_files;
-            delete @f{@{$self->dir_files()}};
-            $self->_report_leaked_files({'leaked_files' => [sort keys %f]});
-            $self->dir_files($new_dir_files);
-        }
-    }
-}
-
-sub _get_failed_with_results_seen_msg
-{
-    my ($self) = @_;
-    
-    return 
-        $self->_is_failed_and_max()
-            ? $self->_get_failed_and_max_msg()
-            : $self->_get_dont_know_which_tests_failed_msg()
-            ;
-}
-
 # FWRS == failed_with_results_seen
 
 sub get_common_FWRS_params
@@ -413,12 +375,6 @@ sub _add_to_failed_tests
     return;
 }
 
-sub _is_test_passing
-{
-    my $self = shift;
-
-    return $self->last_test_results->passing;
-}
 
 sub _process_test_file_results
 {
@@ -437,37 +393,6 @@ sub _process_test_file_results
     return;
 }
 
-sub _get_tot_counter_tests
-{
-    my $self = shift;
-    return [tests => (scalar @{$self->test_files()})];
-}
-
-sub _run_all_tests {
-    my $self = shift;
-
-    _autoflush(\*STDOUT);
-    _autoflush(\*STDERR);
-
-    $self->failed_tests({});
-
-    $self->_init_tot();
-
-    $self->_init_dir_files();
-    my $run_start_time = new Benchmark;
-
-    $self->width($self->_leader_width());
-    foreach my $tfile (@{$self->test_files()}) 
-    {
-        $self->_run_single_test({'test_file' => $tfile});
-    } # foreach test
-    $self->tot()->bench(timediff(new Benchmark, $run_start_time));
-
-    $self->Strap()->_restore_PERL5LIB;
-
-    # TODO: Eliminate this? -- Shlomi Fish
-    return $self->failed_tests();
-}
 
 sub _report_success
 {
@@ -657,27 +582,6 @@ sub _get_skipped_bonusmsg
     my $self = shift;
 
     return $self->tot->_get_skipped_bonusmsg();
-}
-
-sub _get_bonusmsg {
-    my($self) = @_;
-    my $bonus = $self->tot()->bonus();
-
-    if (defined($self->_bonusmsg()))
-    {
-        return $self->_bonusmsg();
-    }
-
-    my $bonusmsg = '';
-    $bonusmsg = (" ($bonus subtest".($bonus > 1 ? 's' : '').
-               " UNEXPECTEDLY SUCCEEDED)")
-        if $bonus;
-
-    $bonusmsg .= $self->_get_skipped_bonusmsg();
-
-    $self->_bonusmsg($bonusmsg);
-
-    return $bonusmsg;
 }
 
 sub _get_dubious_summary

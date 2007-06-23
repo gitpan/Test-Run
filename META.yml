@@ -1,6 +1,6 @@
 ---
 name: Test-Run
-version: 0.0110
+version: 0.0111
 author: []
 abstract: Base class to run standard TAP scripts.
 license: perl
@@ -17,6 +17,7 @@ requires:
   Test::Harness: 2.53
   Test::Trap: 0
   Text::Sprintf::Named: 0.02
+  UNIVERSAL::require: 0
 build_requires:
   Test::Trap: 0
 provides:
@@ -25,13 +26,17 @@ provides:
     version: 0.03
   Test::Run::Base:
     file: lib/Test/Run/Base.pm
+  Test::Run::Base::PlugHelpers:
+    file: lib/Test/Run/Base/PlugHelpers.pm
+  Test::Run::Base::Plugger:
+    file: lib/Test/Run/Base/Plugger.pm
   Test::Run::Base::Struct:
     file: lib/Test/Run/Base/Struct.pm
   Test::Run::Class::Hierarchy:
     file: lib/Test/Run/Class/Hierarchy.pm
   Test::Run::Core:
     file: lib/Test/Run/Core.pm
-    version: 0.0110
+    version: 0.0111
   Test::Run::Core_GplArt:
     file: lib/Test/Run/Core_GplArt.pm
   Test::Run::Iface:

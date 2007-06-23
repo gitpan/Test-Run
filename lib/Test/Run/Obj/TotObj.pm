@@ -95,6 +95,11 @@ sub _initialize
         ", %(good_percent_msg)s%% okay",
     );
 
+    $self->_register_obj_formatter(
+        "positive_bonusmsg",
+        " (%(bonus)s %(_bonus_subtests_str)s UNEXPECTEDLY SUCCEEDED)",
+    );
+
     return $self;
 }
 
@@ -295,6 +300,35 @@ sub _get_skipped_bonusmsg
     }
 }
 
+sub _bonus_subtests_str
+{
+    my $self = shift;
+
+    return $self->_pluralize("subtest", $self->bonus());
+}
+
+sub _get_positive_bonusmsg
+{
+    my $self = shift;
+
+    return $self->_format_self(
+        "positive_bonusmsg"
+    );
+}
+
+sub _get_subtests_bonusmsg
+{
+    my $self = shift;
+    return ($self->bonus() ? $self->_get_positive_bonusmsg() : "");
+}
+
+sub get_bonusmsg
+{
+    my $self = shift;
+
+    return $self->_get_subtests_bonusmsg() . $self->_get_skipped_bonusmsg();
+}
+
 sub _percent_ok
 {
     my $self = shift;
@@ -334,6 +368,26 @@ sub fail_tests_good_percent_string
     return $self->_format_self(
         "fail_tests_good_percent_string",
     );
+}
+
+=head2 $self->benchmark_callback(\&callback)
+
+Benchmarks the callback C<&callback> using the Benchmark module and puts the
+result in the C<bench()> slot.
+
+=cut
+
+sub benchmark_callback
+{
+    my ($self, $cb) = @_;
+
+    my $start_time = new Benchmark;
+    $cb->();
+    my $end_time = new Benchmark;
+
+    $self->bench(Benchmark::timediff($end_time, $start_time));
+
+    return;
 }
 
 1;
