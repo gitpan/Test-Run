@@ -3,7 +3,7 @@ package Test::Run::Core;
 use strict;
 use warnings;
 
-use base 'Test::Run::Core_GplArt';
+use base 'Test::Run::Base::PlugHelpers';
 
 use vars qw($VERSION);
 
@@ -16,17 +16,22 @@ use List::Util ();
 
 use File::Spec;
 
+use Test::Run::Assert;
+use Test::Run::Obj::Error;
+use Test::Run::Straps;
+use Test::Run::Output;
+
 =head1 NAME
 
 Test::Run::Core - Base class to run standard TAP scripts.
 
 =head1 VERSION
 
-Version 0.0112
+Version 0.0113
 
 =cut
 
-$VERSION = '0.0112';
+$VERSION = '0.0113';
 
 $ENV{HARNESS_ACTIVE} = 1;
 $ENV{HARNESS_NG_VERSION} = $VERSION;
@@ -150,6 +155,11 @@ sub _initialize
             base => "Test::Run::Obj::CanonFailedObj",
             collect_plugins_method => "private_canon_failed_obj_plugins",
         },
+    );
+
+    $self->_register_obj_formatter(
+        "fail_other_except",
+        "Failed %(_get_fail_test_scripts_string)s%(_get_fail_tests_good_percent_string)s.%(_get_sub_percent_msg)s\n"
     );
 
 
@@ -449,6 +459,39 @@ sub _is_failed_and_max
     return $self->last_test_obj->is_failed_and_max();
 }
 
+sub _strap_test_handler
+{
+    my ($self, $args) = @_;
+
+    $args->{totals}->update_based_on_last_detail();
+
+    $self->_report_test_progress($args);
+
+    return;
+}
+
+sub _strap_header_handler
+{
+    my ($self, $args) = @_;
+
+    my $totals = $args->{totals};
+
+    if ($self->Strap()->_seen_header())
+    {
+        warn "Test header seen more than once!\n";
+    }
+
+    $self->Strap()->_inc_seen_header();
+
+    if ($totals->in_the_middle())
+    {
+        warn "1..M can only appear at the beginning or end of tests\n";
+    }
+
+    return;
+}
+
+
 sub _tap_event_strap_callback
 {
     my ($self, $args) = @_;
@@ -649,6 +692,55 @@ sub _get_sub_percent_msg
     return $self->tot->get_sub_percent_msg();
 }
 
+sub _handle_passing_test
+{
+    my $self = shift;
+
+    $self->_process_passing_test();
+    $self->_tot_inc('good');
+}
+
+sub _does_test_have_some_oks
+{
+    my $self = shift;
+
+    return $self->last_test_obj->max();
+}
+
+sub _process_passing_test
+{
+    my $self = shift;
+
+    if ($self->_does_test_have_some_oks())
+    {
+        $self->_process_test_with_some_oks();
+    }
+    else
+    {
+        $self->_process_all_skipped_test();
+    }
+}
+
+sub _process_test_with_some_oks
+{
+    my $self = shift;
+
+    if ($self->last_test_obj->skipped_or_bonus())
+    {
+        return $self->_process_skipped_test();
+    }
+    else
+    {
+        return $self->_process_all_ok_test();
+    }
+}
+
+sub _process_all_ok_test
+{
+    my ($self) = @_;
+    return $self->_report_all_ok_test();
+}
+
 sub _process_all_skipped_test
 {
     my $self = shift;
@@ -693,11 +785,6 @@ sub _process_skipped_test
 }
 
 
-sub _process_all_ok_test
-{
-    my ($self) = @_;
-    return $self->_report_all_ok_test();
-}
 
 sub _time_single_test
 {
@@ -877,7 +964,7 @@ sub _get_premature_test_dubious_summary
 
     $self->_report_premature_test_dubious_summary();
 
-    return +{ @{$self->_get_failed_and_max_params()} };
+    return $self->_get_failed_and_max_params();
 }
 
 sub _failed_before_any_test_output
@@ -1073,6 +1160,18 @@ sub _handle_runtests_error_text
     die $text;
 }
 
+sub _is_error_object
+{
+    my $self = shift;
+    my $error = shift;
+
+    return
+    (
+        Scalar::Util::blessed($error) &&
+        $error->isa("Test::Run::Obj::Error::TestsFail")
+    );
+}
+
 sub _get_runtests_error_text
 {
     my $self = shift;
@@ -1097,6 +1196,51 @@ sub _is_no_tests_output
     my $self = shift;
 
     return (! $self->tot->max());
+}
+
+sub _report_success
+{
+    my $self = shift;
+    $self->_report(
+        {
+            'channel' => "success",
+            'event' => { 'type' => "success", },
+        }
+    );
+
+    return;
+}
+
+sub _fail_other_if_bad
+{
+    my $self = shift;
+
+    if ($self->tot->bad)
+    {
+        $self->_fail_other_print_bonus_message();
+        $self->_fail_other_throw_exception();
+    }
+
+    return;
+}
+
+sub _calc__fail_other__callbacks
+{
+    my $self = shift;
+
+    return [qw(
+        _create_fmts
+        _fail_other_print_top
+        _fail_other_print_all_tests
+        _fail_other_if_bad
+    )];
+}
+
+sub _fail_other
+{
+    shift->_run_sequence();
+
+    return;
 }
 
 sub _show_success_or_failure
@@ -1164,6 +1308,20 @@ sub _canonfailed_get_canon
     );
 }
 
+sub _prepare_for_single_test_run
+{
+    my ($self, $args) = @_;
+
+    $self->_tot_inc('files');
+
+    $self->Strap()->_seen_header(0);
+
+    $self->_report_single_test_file_start($args);
+
+    return;
+}
+
+
 sub _calc__run_single_test__callbacks
 {
     my $self = shift;
@@ -1181,12 +1339,53 @@ sub _run_single_test
 {
     my ($self, $args) = @_;
 
-    foreach my $cb (@{$self->_calc__run_single_test__callbacks()})
+    $self->_run_sequence([$args]);
+
+    return;
+}
+
+sub _list_tests_as_failures
+{
+    my $self = shift;
+
+    return 
+        $self->last_test_obj->list_tests_as_failures(
+            $self->last_test_results->details()
+        );
+}
+
+sub _process_test_file_results
+{
+    my ($self) = @_;
+
+    if ($self->_is_test_passing()) 
     {
-        $self->$cb($args);
+        $self->_handle_passing_test();
+    }
+    else
+    {
+        $self->_list_tests_as_failures();
+        $self->_add_to_failed_tests();
     }
 
     return;
+}
+
+sub _real_runtests
+{
+    my $self = shift;
+
+    my ($failed_tests) = $self->_run_all_tests();
+
+    $self->_show_results();
+
+    my $ok = $self->_all_ok();
+
+    assert( ($ok xor keys(%$failed_tests)),
+            q{$ok is mutually exclusive with %$failed_tests}
+        );
+
+    return $ok;
 }
 
 sub runtests
@@ -1254,6 +1453,81 @@ sub _prepare_run_all_tests
     $self->_init_dir_files();
 }
 
+# FWRS == failed_with_results_seen
+sub get_common_FWRS_params
+{
+    my $self = shift;
+
+    return
+    [
+        max => $self->last_test_obj->max(),
+        name => $self->_get_last_test_filename(),
+        estat => "",
+        wstat => "",
+        list_len => $self->list_len(),
+    ];
+}
+
+sub _get_failed_with_results_seen_params
+{
+    my ($self) = @_;
+
+    return 
+        {
+            @{$self->get_common_FWRS_params()},
+            @{$self->_get_FWRS_tests_existence_params()},
+        }
+}
+
+sub _failed_with_results_seen
+{
+    my $self = shift;
+
+    $self->_inc_bad();
+
+    $self->_report_failed_with_results_seen();
+
+    return
+        $self->_create_failed_obj_instance(
+            $self->_get_failed_with_results_seen_params(),
+        );
+}
+
+sub _get_failed_struct
+{
+    my ($self) = @_;
+
+    if ($self->_get_wstatus())
+    {
+         return $self->_dubious_return();
+    }
+    elsif($self->_is_last_test_seen())
+    {
+        return $self->_failed_with_results_seen();
+    }
+    else
+    {
+        return $self->_failed_before_any_test_output();
+    }
+}
+
+sub _add_to_failed_tests
+{
+    my $self = shift;
+
+    $self->failed_tests()->{$self->_get_last_test_filename()} = 
+        $self->_get_failed_struct();
+
+    return;
+}
+
+sub _get_last_test_filename
+{
+    my $self = shift;
+
+    return $self->last_test_results->filename();
+}
+
 sub _init_dir_files
 {
     my $self = shift;
@@ -1303,6 +1577,244 @@ sub _run_all_tests {
 
     # TODO: Eliminate this? -- Shlomi Fish
     return $self->failed_tests();
+}
+
+sub _get_dubious_summary_all_subtests_successful
+{
+    my ($self, $args) = @_;
+
+    $self->_report_dubious_summary_all_subtests_successful();
+
+    return
+    [
+        failed => 0,
+        percent => 0,
+        canon => "??",
+    ];
+}
+
+sub _get_no_tests_summary
+{
+    my ($self, $args) = @_;
+
+    return
+    [
+        failed => "??",
+        canon => "??",
+        percent => undef(),
+    ];
+}
+
+sub _get_dubious_summary
+{
+    my ($self, $args) = @_;
+
+    my $method = $self->last_test_obj->get_dubious_summary_main_obj_method();
+
+    return $self->$method($args);
+}
+
+sub _get_skipped_bonusmsg
+{
+    my $self = shift;
+
+    return $self->tot->_get_skipped_bonusmsg();
+}
+
+sub _get_wstatus
+{
+    my $self = shift;
+
+    return $self->last_test_results->wait;
+}
+
+sub _get_estatus
+{
+    my $self = shift;
+
+    return $self->last_test_results->exit;
+}
+
+sub _get_format_failed_str
+{
+    my $self = shift;
+
+    return "Failed Test";
+}
+
+sub _get_format_failed_str_len
+{
+    my $self = shift;
+
+    return length($self->_get_format_failed_str());
+}
+
+sub _get_num_columns
+{
+    my $self = shift;
+
+    # Some shells don't handle a full line of text well so we increment
+    # 1.
+    return ($self->Columns() - 1);
+}
+
+# Find the maximal name length among the failed_tests().
+sub _calc_initial_max_namelen
+{
+    my $self = shift;
+
+    my $max = $self->_get_format_failed_str_len();
+
+    while (my ($k, $v) = each(%{$self->failed_tests()}))
+    {
+        my $l = length($v->{name});
+
+        if ($l > $max)
+        {
+            $max = $l;
+        }
+    }
+
+    $self->max_namelen($max);
+
+    return;
+}
+
+sub _calc_len_subtraction
+{
+    my ($self, $field) = @_;
+
+    return $self->format_columns() 
+         - $self->_get_fmt_mid_str_len()
+         - $self->$field()
+         ;
+}
+
+sub _calc_initial_list_len
+{
+    my $self = shift;
+
+    $self->format_columns($self->_get_num_columns());
+
+    $self->list_len(
+        $self->_calc_len_subtraction("max_namelen")
+    );
+
+    return;
+}
+
+sub _calc_updated_lens
+{
+    my $self = shift;
+
+    $self->list_len($self->_get_fmt_list_str_len);
+    $self->max_namelen($self->_calc_len_substraction("list_len"));
+}
+
+sub _calc_more_updated_lens
+{
+    my $self = shift;
+
+    $self->max_namelen($self->_get_format_failed_str_len());
+
+    $self->format_columns(
+          $self->max_namelen()
+        + $self->_get_fmt_mid_str_len()
+        + $self->list_len()
+    );
+}
+
+sub _calc_fmt_list_len
+{
+    my $self = shift;
+
+    $self->_calc_initial_list_len();
+
+    if ($self->list_len() < $self->_get_fmt_list_str_len()) {
+        $self->_calc_updated_lens();
+        if ($self->max_namelen() < $self->_get_format_failed_str_len()) 
+        {
+            $self->_calc_more_updated_lens();
+        }
+    }
+
+    return;
+}
+
+sub _calc_format_widths
+{
+    my $self = shift;
+
+    $self->_calc_initial_max_namelen();
+    
+    $self->_calc_fmt_list_len();
+
+    return;
+}
+
+sub _get_format_middle_str
+{
+    my $self = shift;
+
+    return " Stat Wstat Total Fail  Failed  ";
+}
+
+sub _get_fmt_mid_str_len
+{
+    my $self = shift;
+
+    return length($self->_get_format_middle_str());
+}
+
+sub _get_fmt_list_str_len
+{
+    my $self = shift;
+
+    return length($self->_get_format_list_str());
+}
+
+sub _get_format_list_str
+{
+    my $self = shift;
+
+    return "List of Failed";
+}
+
+sub _create_fmts
+{
+    my $self = shift;
+
+    $self->_calc_format_widths();
+
+    return;
+}
+
+sub _get_fail_other_exception_text
+{
+    my $self = shift;
+
+    return $self->_format_self("fail_other_except");
+}
+
+sub _calc_dubious_return_ret_value
+{
+    my $self = shift;
+
+    return $self->_create_failed_obj_instance(
+        $self->_calc_dubious_return_failed_obj_params(),
+    );
+}
+
+sub _calc_dubious_return_failed_obj_params
+{
+    my $self = shift;
+
+    return
+    {
+        @{$self->_get_dubious_summary()},
+        @{$self->last_test_obj->get_failed_obj_params()},
+        @{$self->last_test_results->get_failed_obj_params()},
+    };
 }
 
 =head2 $self->_report_failed_before_any_test_output();
@@ -1477,6 +1989,71 @@ $args are the test-context - see above.
 =cut
 
 1;
+
+=head1 AUTHOR
+
+Test::Run::Core is based on L<Test::Harness>, and has later been spinned off
+as a separate module.
+
+=head2 Test:Harness Authors
+
+Either Tim Bunce or Andreas Koenig, we don't know. What we know for
+sure is, that it was inspired by Larry Wall's TEST script that came
+with perl distributions for ages. Numerous anonymous contributors
+exist.  Andreas Koenig held the torch for many years, and then
+Michael G Schwern.
+
+Test::Harness was then maintained by Andy Lester C<< <andy at petdance.com> >>.
+
+=head2 Test::Run::Obj Authors
+
+Shlomi Fish C<< <shlomif@iglu.org.il> >>
+
+Note: this file is a rewrite of the original Test::Run code in order to 
+change to a more liberal license.
+
+=head1 BUGS
+
+Please report any bugs or feature requests to
+C<bug-test-run at rt.cpan.org>, or through the web interface at
+L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Test::Run>.
+I will be notified, and then you'll automatically be notified of progress on
+your bug as I make changes.
+
+=head1 SUPPORT
+
+You can find documentation for this module with the perldoc command.
+
+    perldoc Test::Run::Core
+
+You can also look for information at:
+
+=over 4
+
+=item * AnnoCPAN: Annotated CPAN documentation
+
+L<http://annocpan.org/dist/Test::Run::Core>
+
+=item * CPAN Ratings
+
+L<http://cpanratings.perl.org/d/Test::Run::Core>
+
+=item * RT: CPAN's request tracker
+
+L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Test::Run>
+
+=item * Search CPAN
+
+L<http://search.cpan.org/dist/Test::Run>
+
+=back
+
+=head1 SOURCE AVAILABILITY
+
+The latest source of Test::Run is available from its BerliOS Subversion
+repository:
+
+L<https://svn.berlios.de/svnroot/repos/web-cpan/Test-Harness-NG/>
 
 =head1 LICENSE
 

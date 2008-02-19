@@ -1,5 +1,8 @@
 package Test::Run::Obj::TestObj;
 
+use strict;
+use warnings;
+
 =head1 NAME
 
 Test::Run::Obj::TestObj - results of a single test script.
@@ -73,8 +76,6 @@ sub _initialize
     my ($self, $args) = @_;
 
     $self->NEXT::_initialize($args);
-
-    $self->_formatters($self->_formatters() || {});
 
     $self->_register_obj_formatter(
         "dont_know_which_tests_failed",
@@ -153,6 +154,107 @@ sub _get_dont_know_which_tests_failed_msg
     return $self->_format_self("dont_know_which_tests_failed");
 }
 
+sub skipped_or_bonus
+{
+    my $self = shift;
+
+    return $self->skipped() || $self->bonus();
+}
+
+=head2 $self->all_succesful()
+
+A predicate that calculates if all the tests in the TestObj were successful.
+
+=cut 
+
+sub all_succesful
+{
+    my $self = shift;
+
+    return
+    (
+        ($self->next() == $self->max() + 1)
+            &&
+        (! @{$self->failed()})
+    );
+}
+
+=head2 $self->get_dubious_summary_main_obj_method()
+
+Returns the method name of the main object that should be propagated
+based on the success/failure status of this test object.
+
+=cut
+
+sub get_dubious_summary_main_obj_method
+{
+    my $self = shift;
+
+    return 
+        $self->max()
+            ? ($self->all_succesful()
+                ? "_get_dubious_summary_all_subtests_successful"
+                : "_get_premature_test_dubious_summary"
+              )
+            : "_get_no_tests_summary"
+        ;
+}
+
+=head2 $self->get_failed_obj_params
+
+Returns a key value array ref of params for initializing the failed-object.
+
+=cut
+
+sub get_failed_obj_params
+{
+    my $self = shift;
+
+    return
+        [
+            max => ($self->max() || "??"),
+        ];
+}
+
+sub _still_running
+{
+    my $self = shift;
+
+    return ($self->next() <= $self->max());
+}
+
+
+sub _calc_tests_as_failures
+{
+    my ($self, $details) = @_;
+
+    if ($self->_still_running())
+    {
+        return [$self->next() .. $self->max()];
+    }
+    else
+    {
+        return
+        [
+            grep { ref($details->[$_-1]) }
+            (($self->max()+1) .. @$details)
+        ];
+    }
+}
+
+=head2 $self->list_tests_as_failures($last_test_results->details())
+
+Lists the tests as failures where appropriate.
+
+=cut
+
+sub list_tests_as_failures
+{
+    my ($self, $details) = @_;
+
+    $self->add_to_failed(@{$self->_calc_tests_as_failures($details)});
+}
+
 1;
 
 __END__
@@ -164,6 +266,8 @@ L<Test::Run::Base::Struct>, L<Test::Run::Obj>, L<Test::Run::Core>
 =head1 LICENSE
 
 This file is freely distributable under the MIT X11 license.
+
+L<http://www.opensource.org/licenses/mit-license.php>
 
 =head1 AUTHOR
 

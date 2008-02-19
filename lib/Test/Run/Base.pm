@@ -19,9 +19,11 @@ sub new
     my $class = shift;
     my $self = {};
     bless $self, $class;
+    $self->_formatters({});
     $self->_initialize(@_);
     return $self;
 }
+
 
 =head2 $dest->copy_from($source, [@fields])
 
@@ -146,6 +148,56 @@ sub _pluralize
         $noun,
         (($count > 1) ? "s" : "")
     );
+}
+
+=head2 $self->_run_sequence(\@params)
+
+Runs the sequence of commands specified using 
+C<_calc__${calling_sub}__callbacks> while passing @params to 
+each one. Generates a list of all the callbacks return values.
+
+=cut
+
+sub _run_sequence
+{
+    my $self = shift;
+    my $params = shift || [];
+
+    my $sub = (caller(1))[3];
+
+    $sub =~ s{::_?([^:]+)$}{};
+
+    my $calc_cbs_sub = "_calc__${1}__callbacks";
+
+    return 
+    [ 
+        map { my $cb = $_; $self->$cb(@$params); }
+        @{$self->$calc_cbs_sub(@$params)}
+    ];
+}
+
+=head2 $package->delegate_methods($field, \@methods)
+
+Delegates the methods listed in @methods (as strings) to the accessor
+specified by $field.
+
+=cut
+
+sub delegate_methods
+{
+    my ($pkg, $field, $methods) = @_;
+
+    no strict 'refs';
+    foreach my $method (@$methods)
+    {
+        *{$pkg."::".$method} =
+            do {
+                my $m = $method;
+                sub { my $self = shift; return $self->$field->$m(@_); };
+            };
+    }
+
+    return;
 }
 
 1;

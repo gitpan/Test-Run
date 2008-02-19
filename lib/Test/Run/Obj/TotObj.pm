@@ -1,5 +1,8 @@
 package Test::Run::Obj::TotObj;
 
+use strict;
+use warnings;
+
 =head1 NAME
 
 Test::Run::Obj::TotObj - totals encountered for the entire Test::Run session
@@ -57,8 +60,6 @@ sub _initialize
     my $self = shift;
 
     $self->NEXT::_initialize(@_);
-
-    $self->_formatters($self->_formatters() || {});
 
     $self->_register_obj_formatter(
         "fail_no_tests_output",
@@ -401,6 +402,8 @@ L<Test::Run::Base::Struct>, L<Test::Run::Obj>, L<Test::Run::Core>
 =head1 LICENSE
 
 This file is freely distributable under the MIT X11 license.
+
+L<http://www.opensource.org/licenses/mit-license.php>
 
 =head1 AUTHOR
 

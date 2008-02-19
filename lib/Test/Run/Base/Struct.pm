@@ -1,5 +1,8 @@
 package Test::Run::Base::Struct;
 
+use strict;
+use warnings;
+
 =head1 NAME
 
 Test::Run::Base::Struct - base class for Test::Run's "structs", that are
@@ -108,6 +111,8 @@ L<Test::Run::Base>, L<Test::Run::Obj>, L<Test::Run::Core>
 =head1 LICENSE
 
 This file is freely distributable under the MIT X11 license.
+
+L<http://www.opensource.org/licenses/mit-license.php>
 
 =head1 AUTHOR
 

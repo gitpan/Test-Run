@@ -60,7 +60,6 @@ sub _initialize
     my ($args) = @_;
 
     $self->output($self->_get_new_output($args));
-    $self->_formatters({});
     {
         my %formatters =
         (
@@ -121,7 +120,7 @@ sub _get_dubious_verdict_message
     return "dubious";
 }
 
-sub _get_callbacks_list_for_dubious_message
+sub _calc__get_dubious_message_components__callbacks
 {
     my $self = shift;
 
@@ -138,11 +137,7 @@ sub _get_dubious_message_components
 {
     my $self = shift;
 
-    return 
-    [ 
-        map { my $cb = $_; $self->$cb() } 
-        @{$self->_get_callbacks_list_for_dubious_message()}
-    ];
+    return $self->_run_sequence([@_]);
 }
 
 sub _get_dubious_message_line_end
@@ -638,7 +633,9 @@ sub _fail_other_print_top
 
 =head1 LICENSE
 
-This code is licensed under the MIT X11 License.
+This file is licensed under the MIT X11 License.
+
+L<http://www.opensource.org/licenses/mit-license.php>
 
 =cut
 

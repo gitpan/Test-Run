@@ -186,8 +186,6 @@ sub _calc_details
 {
     my $self = shift;
 
-    my $event = $self->_event;
-
     return
         $self->_init_details_obj_instance(
             {
@@ -215,13 +213,6 @@ sub _update_skip_event
     return;
 }
 
-sub _is_event_todo
-{
-    my $self = shift;
-
-    return $self->_event->has_todo();
-}
-
 sub _update_if_pass
 {
     my $self = shift;
@@ -236,12 +227,7 @@ sub _is_event_pass
 {
     my $self = shift;
 
-    return
-    (
-        $self->_event->is_ok() || 
-        $self->_is_event_todo() || 
-        $self->_event->has_skip()
-    );
+    return $self->_event->is_pass();
 }
 
 sub _handle_enormous_event_num
@@ -388,6 +374,59 @@ sub _get_failed_details
     my $details = $self->details;
 
     return [ grep {! $details->[$_-1]->{ok} } (1 .. @$details) ];
+}
+
+=head2 $self->get_failed_obj_params
+
+Returns a key value array ref of params for initializing the failed-object.
+
+=cut
+
+sub get_failed_obj_params
+{
+    my $self = shift;
+
+    return
+        [
+            estat => $self->exit(),
+            wstat => $self->wait(),
+            name  => $self->filename(),
+        ];
+}
+
+=head2 $self->update_based_on_last_detail()
+
+Check if the last_detail is OK, and if so update the skip_reason
+based on it.
+
+=cut
+
+sub update_based_on_last_detail
+{
+    my $self = shift;
+
+    my $detail = $self->last_detail();
+
+    if ( $detail->ok() )
+    {
+        $self->update_skip_reason($detail);
+    }
+
+    return;
+}
+
+=head2 $self->in_the_middle()
+
+Checks if the tests are in the middle - already some were seen but the
+end was not reached.
+
+=cut
+
+sub in_the_middle
+{
+    my $self = shift;
+
+    return ($self->seen() && ($self->seen() > $self->max()));
 }
 
 =head2 $self->bonus()

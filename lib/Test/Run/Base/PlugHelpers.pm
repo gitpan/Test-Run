@@ -1,5 +1,8 @@
 package Test::Run::Base::PlugHelpers;
 
+use strict;
+use warnings;
+
 =head1 NAME
 
 Test::Run::Base::PlugHelpers - base class for Test::Run's classes with
@@ -147,6 +150,7 @@ L<Test::Run::Base>, L<Test::Run::Obj>, L<Test::Run::Core>
 
 This file is freely distributable under the MIT X11 license.
 
+L<http://www.opensource.org/licenses/mit-license.php>
 =head1 AUTHOR
 
 Shlomi Fish, L<http://www.shlomifish.org/>.

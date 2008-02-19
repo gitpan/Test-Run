@@ -20,7 +20,10 @@ lib/Test/Run/Obj/TestObj.pm
 lib/Test/Run/Obj/TotObj.pm
 lib/Test/Run/Output.pm
 lib/Test/Run/Plugin/CmdLine/Output.pm
+lib/Test/Run.pm
 lib/Test/Run/Sprintf/Named/FromAccessors.pm
+lib/Test/Run/Straps/EventWrapper.pm
+lib/Test/Run/Straps_GplArt.pm
 lib/Test/Run/Straps.pm
 lib/Test/Run/Straps/StrapsDetailsObj.pm
 lib/Test/Run/Straps/StrapsTotalsObj.pm
@@ -94,6 +97,7 @@ t/test-failure-report.t
 t/test-harness.t
 t/test-libs/lib1/MyHello.pm
 t/test-libs/lib2/MyFoo.pm
+t/t-r-base-delegate.t
 t/t-r-base-plugger.t
 t/undef-warnings.t
 t/version.t

@@ -1,5 +1,8 @@
 package Test::Run::Straps::StrapsDetailsObj;
 
+use strict;
+use warnings;
+
 =head1 NAME
 
 Test::Run::Straps::StrapsDetailsObj - a struct representing the details of
@@ -62,6 +65,8 @@ L<Test::Run::Base::Struct>, L<Test::Run::Obj>, L<Test::Run::Core>
 =head1 LICENSE
 
 This file is freely distributable under the terms of the MIT X11 License.
+
+L<http://www.opensource.org/licenses/mit-license.php>
 
 =head1 AUTHOR
 
