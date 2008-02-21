@@ -12,7 +12,7 @@ WriteMakefile
                            'Scalar::Util' => 0,
                            'File::Spec' => '0.6',
                            'Test::Trap' => 0,
-                           'TAP::Parser' => '0.51',
+                           'TAP::Parser' => '3.09',
                            'Class::Accessor' => 0,
                            'NEXT' => 0,
                            'Text::Sprintf::Named' => '0.02',
