@@ -9,6 +9,8 @@ use NEXT;
 
 use base 'Test::Run::Base';
 
+use Test::Run::Output;
+
 =head1 NAME
 
 Test::Run::Plugin::CmdLine::Output - the default output plugin for
@@ -293,17 +295,42 @@ sub _get_all_skipped_test_msgs
     ];
 }
 
+sub _reset_output_watch
+{
+    my $self = shift;
+
+    $self->output()->last_test_print(0);
+
+    return;
+}
+
+sub _output__get_display_filename_param
+{
+    my ($self, $args) = @_;
+
+    return $self->_get_test_file_display_path($args->{test_file});
+}
+
+sub _output_print_leader
+{
+    my ($self, $args) = @_;
+    
+    $self->output()->print_leader(
+        {
+            filename => $self->_output__get_display_filename_param($args),
+            width => $self->width(),
+        }
+    );
+
+    return;
+}
+
 sub _report_single_test_file_start_leader
 {
     my ($self, $args) = @_;
 
-    $self->output()->last_test_print(0);
-    $self->output()->print_leader(
-        {
-            filename => $args->{test_file},
-            width => $self->width(),
-        }
-    );
+    $self->_reset_output_watch($args);
+    $self->_output_print_leader($args);
 }
 
 sub _report_single_test_file_start_debug
@@ -313,7 +340,7 @@ sub _report_single_test_file_start_debug
     if ($self->Debug())
     {
         $self->_print(
-            "# Running: " . $self->Strap()->_command_line($args->{test_file})
+            "# Running: " . $self->Strap()->_command_line($self->_output_print_leader($args))
         );
     }
 }

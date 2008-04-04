@@ -54,16 +54,12 @@ sub _initialize
     return 0;
 }
 
-=head1 $event->is_pass()
+=head2 $event->is_pass()
 
 Returns whether the event can be considered a passed event. Always returns a
 scalar boolean.
 
 =cut
-
-# TODO:
-# Unit test this function to make sure it returns a scalar even in
-# list context, in a similar fashion to the || thing.
 
 sub is_pass
 {
@@ -79,5 +75,35 @@ sub is_pass
 
     return 0;
 }
+
+=head2 $self->get_next_test_number()
+
+If this event is a test, then return the next expected test number. Else
+return undef.
+
+=cut
+
+sub get_next_test_number
+{
+    my $self = shift;
+
+    return ($self->is_test() ? ($self->number() +1 ) : undef);
+}
+
+=head1 SEE ALSO
+
+L<Test::Run::Straps>, L<Test::Run::Obj>, L<Test::Run::Core>
+
+=head1 LICENSE
+
+This file is licensed under the MIT X11 License:
+
+http://www.opensource.org/licenses/mit-license.php
+
+=head1 AUTHOR
+
+Shlomi Fish, L<http://www.shlomifish.org/>.
+
+=cut
 
 1;

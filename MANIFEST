@@ -22,6 +22,7 @@ lib/Test/Run/Output.pm
 lib/Test/Run/Plugin/CmdLine/Output.pm
 lib/Test/Run.pm
 lib/Test/Run/Sprintf/Named/FromAccessors.pm
+lib/Test/Run/Straps/Base.pm
 lib/Test/Run/Straps/EventWrapper.pm
 lib/Test/Run/Straps_GplArt.pm
 lib/Test/Run/Straps.pm
@@ -33,6 +34,7 @@ MANIFEST
 META.yml                                 Module meta-data (added by MakeMaker)
 NOTES
 t/00compile.t
+t/01unit-event-wrapper.t
 t/accumulate.t
 t/base.t
 t/data/interpreters/wrong-mini-ok.pl
@@ -53,6 +55,7 @@ TODO
 t/ok.t
 t/output.t
 t/pluggable-helpers.t
+t/pod-coverage.t
 t/pod.t
 t/sample-tests/bailout
 t/sample-tests/bignum

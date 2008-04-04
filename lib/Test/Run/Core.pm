@@ -19,7 +19,6 @@ use File::Spec;
 use Test::Run::Assert;
 use Test::Run::Obj::Error;
 use Test::Run::Straps;
-use Test::Run::Output;
 
 =head1 NAME
 
@@ -27,11 +26,11 @@ Test::Run::Core - Base class to run standard TAP scripts.
 
 =head1 VERSION
 
-Version 0.0113
+Version 0.0115
 
 =cut
 
-$VERSION = '0.0114';
+$VERSION = '0.0115';
 
 $ENV{HARNESS_ACTIVE} = 1;
 $ENV{HARNESS_NG_VERSION} = $VERSION;
@@ -67,6 +66,7 @@ sub _get_private_simple_params
             Switches
             Switches_Env
             test_files
+            test_files_data
             Test_Interpreter
             Timer
             Verbose
@@ -108,7 +108,12 @@ sub _get_new_strap
 {
     my $self = shift;
 
-    return Test::Run::Straps->new({});
+    return $self->create_pluggable_helper_obj(
+        {
+            id => "straps",
+            args => {},
+        }
+    );
 }
 
 sub _initialize
@@ -121,8 +126,14 @@ sub _initialize
     $self->Switches("-w");
     $self->_init_simple_params($args);
     $self->dir_files([]);
-    $self->Strap(
-        $self->_get_new_strap($args),
+    $self->test_files_data({});
+
+    $self->register_pluggable_helper(
+        {
+            id => "straps",
+            base => "Test::Run::Straps",
+            collect_plugins_method => "private_straps_plugins",
+        },
     );
 
     $self->register_pluggable_helper(
@@ -162,9 +173,18 @@ sub _initialize
         "Failed %(_get_fail_test_scripts_string)s%(_get_fail_tests_good_percent_string)s.%(_get_sub_percent_msg)s\n"
     );
 
+    $self->Strap(
+        $self->_get_new_strap($args),
+    );
 
     return 0;
 }
+
+=head2 $self->helpers_base_namespace()
+
+See L<Test::Run::Base::PlugHelpers>.
+
+=cut
 
 sub helpers_base_namespace
 {
@@ -861,7 +881,7 @@ sub _canonfailed
 }
 
 
-sub filter_failed
+sub _filter_failed
 {
     my ($self, $failed_ref) = @_;
     return [ List::MoreUtils::uniq(sort { $a <=> $b } @$failed_ref) ];
@@ -871,7 +891,7 @@ sub _canonfailed_get_failed
 {
     my $self = shift;
 
-    return $self->filter_failed($self->_get_failed_list());
+    return $self->_filter_failed($self->_get_failed_list());
 }
 
 =head2 $self->_calc_test_struct_ml($results)
@@ -1007,7 +1027,9 @@ sub _get_filename_map_max_len
     my ($self, $cb) = @_;
 
     return $self->_max_len(
-        [ map { $self->$cb($_) } @{$self->test_files()} ]
+        [ map { $self->$cb($self->_get_test_file_display_path($_)) }
+          @{$self->test_files()} 
+        ]
     );
 }
 
@@ -1371,21 +1393,74 @@ sub _process_test_file_results
     return;
 }
 
-sub _real_runtests
+sub _check_for_ok
 {
     my $self = shift;
 
-    my ($failed_tests) = $self->_run_all_tests();
-
-    $self->_show_results();
-
-    my $ok = $self->_all_ok();
-
-    assert( ($ok xor keys(%$failed_tests)),
+    assert( ($self->_all_ok() xor keys(%{$self->failed_tests()})),
             q{$ok is mutually exclusive with %$failed_tests}
         );
 
-    return $ok;
+    return;
+
+}
+
+sub _calc_test_file_data_display_path
+{
+    my ($self, $idx, $test_file) = @_;
+
+    return $test_file;
+}
+
+sub _get_test_file_display_path
+{
+    my ($self, $test_file) = @_;
+
+    return $self->test_files_data()->{$test_file}->{display_path};
+}
+
+sub _calc_test_file_data_struct
+{
+    my ($self, $idx, $test_file) = @_;
+
+    return
+    {
+        idx => $idx,
+        real_path => $test_file,
+        display_path => $self->_calc_test_file_data_display_path($idx, $test_file),
+    };
+}
+
+sub _prepare_test_files_data
+{
+    my $self = shift;
+
+    foreach my $idx (0 .. $#{$self->test_files()})
+    {
+        my $test_file = $self->test_files()->[$idx];
+
+        $self->test_files_data()->{$test_file} =
+            $self->_calc_test_file_data_struct($idx, $test_file);
+    }
+}
+
+sub _calc__real_runtests__callbacks
+{
+    my $self = shift;
+
+    return
+    [qw(
+        _run_all_tests
+        _show_results
+        _check_for_ok
+    )];
+}
+
+sub _real_runtests
+{
+    shift->_run_sequence();
+
+    return;
 }
 
 sub runtests
@@ -1394,9 +1469,11 @@ sub runtests
 
     local ($\, $,);
 
-    my $ok = eval { $self->_real_runtests(@_) };
+    eval { $self->_real_runtests(@_) };
 
     my $error = $@;
+
+    my $ok = $self->_all_ok();
 
     if ($error)
     {
@@ -1444,6 +1521,8 @@ sub _prepare_run_all_tests
 {
     my $self = shift;
 
+    $self->_prepare_test_files_data();
+
     $self->_autoflush_file_handles();
 
     $self->_init_failed_tests();
@@ -1451,10 +1530,12 @@ sub _prepare_run_all_tests
     $self->_init_tot();
 
     $self->_init_dir_files();
+
+    return;
 }
 
 # FWRS == failed_with_results_seen
-sub get_common_FWRS_params
+sub _get_common_FWRS_params
 {
     my $self = shift;
 
@@ -1474,7 +1555,7 @@ sub _get_failed_with_results_seen_params
 
     return 
         {
-            @{$self->get_common_FWRS_params()},
+            @{$self->_get_common_FWRS_params()},
             @{$self->_get_FWRS_tests_existence_params()},
         }
 }
@@ -1535,8 +1616,9 @@ sub _init_dir_files
     if (defined($self->Leaked_Dir()))
     {
         $self->dir_files($self->_get_dir_files());
-    }   
+    }
 }
+
 sub _run_all_tests_loop
 {
     my $self = shift;
@@ -1566,18 +1648,24 @@ sub _finalize_run_all_tests
     $self->Strap()->_restore_PERL5LIB();
 }
 
-sub _run_all_tests {
+sub _calc__run_all_tests__callbacks
+{
     my $self = shift;
 
-    $self->_prepare_run_all_tests();
-
-    $self->_run_all_tests__run_loop();
-
-    $self->_finalize_run_all_tests();
-
-    # TODO: Eliminate this? -- Shlomi Fish
-    return $self->failed_tests();
+    return
+    [qw(
+        _prepare_run_all_tests
+        _run_all_tests__run_loop
+        _finalize_run_all_tests
+    )];
 }
+
+sub _run_all_tests {
+    shift->_run_sequence();
+
+    return;
+}
+
 
 sub _get_dubious_summary_all_subtests_successful
 {
@@ -1708,7 +1796,7 @@ sub _calc_updated_lens
     my $self = shift;
 
     $self->list_len($self->_get_fmt_list_str_len);
-    $self->max_namelen($self->_calc_len_substraction("list_len"));
+    $self->max_namelen($self->_calc_len_subtraction("list_len"));
 }
 
 sub _calc_more_updated_lens
@@ -1985,6 +2073,11 @@ $args are the test-context - see above.
 [This is a method that needs to be over-rided.]
 
 $args are the test-context - see above.
+
+=head2 opendir
+
+This method is placed in the namespace by Fatal.pm. This entry is here just
+to settle Pod::Coverage.
 
 =cut
 

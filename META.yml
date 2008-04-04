@@ -1,12 +1,12 @@
 ---
 name: Test-Run
-version: 0.0114
+version: 0.0115
 author:
   - 'Shlomi Fish C<< <shlomif@iglu.org.il> >>'
 abstract: Base class to run standard TAP scripts.
-license: perl
+license: mit
 resources:
-  license: http://dev.perl.org/licenses/
+  license: http://opensource.org/licenses/mit-license.php
 requires:
   Class::Accessor: 0
   File::Spec: 0.6
@@ -38,7 +38,7 @@ provides:
     file: lib/Test/Run/Class/Hierarchy.pm
   Test::Run::Core:
     file: lib/Test/Run/Core.pm
-    version: 0.0114
+    version: 0.0115
   Test::Run::Core_GplArt:
     file: lib/Test/Run/Core_GplArt.pm
   Test::Run::Iface:
@@ -49,6 +49,10 @@ provides:
   Test::Run::Obj::CanonFailedObj:
     file: lib/Test/Run/Obj/CanonFailedObj.pm
   Test::Run::Obj::Error:
+    file: lib/Test/Run/Obj/Error.pm
+  Test::Run::Obj::Error::Straps:
+    file: lib/Test/Run/Obj/Error.pm
+  Test::Run::Obj::Error::Straps::CannotRunPerl:
     file: lib/Test/Run/Obj/Error.pm
   Test::Run::Obj::Error::TestsFail:
     file: lib/Test/Run/Obj/Error.pm
@@ -75,6 +79,8 @@ provides:
   Test::Run::Straps:
     file: lib/Test/Run/Straps.pm
     version: 0.26
+  Test::Run::Straps::Base:
+    file: lib/Test/Run/Straps/Base.pm
   Test::Run::Straps::EventWrapper:
     file: lib/Test/Run/Straps/EventWrapper.pm
   Test::Run::Straps::StrapsDetailsObj:

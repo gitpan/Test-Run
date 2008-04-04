@@ -14,7 +14,7 @@ straps class.
 
 use Test::Run::Straps::StrapsDetailsObj;
 
-use base 'Test::Run::Base::Struct';
+use base 'Test::Run::Straps::Base';
 
 use vars qw(@fields);
 
@@ -22,7 +22,6 @@ use vars qw(@fields);
     bonus
     details
     _enormous_num_cb
-    _event
     exit
     filename
     max
@@ -223,13 +222,6 @@ sub _update_if_pass
     }
 }
 
-sub _is_event_pass
-{
-    my $self = shift;
-
-    return $self->_event->is_pass();
-}
-
 sub _handle_enormous_event_num
 {
     my $self = shift;
@@ -259,7 +251,7 @@ sub _inc_seen
     $self->inc_field('seen');
 }
 
-=head2 $self->_handle_event({event => $event, enormous_num_cb => sub {...}});
+=head2 $self->handle_event({event => $event, enormous_num_cb => sub {...}});
 
 Updates the state of the details using a new TAP::Parser event - $event .
 C<enormous_num_cb> points to a subroutine reference that is the callback for
@@ -427,6 +419,49 @@ sub in_the_middle
     my $self = shift;
 
     return ($self->seen() && ($self->seen() > $self->max()));
+}
+
+sub _wait2exit_POSIX
+{
+    my ($self, $wait) = @_;
+
+    return POSIX::WEXITSTATUS($wait);
+}
+
+sub _wait2exit_no_POSIX
+{
+    my ($self, $wait) = @_;
+
+    return ($wait >> 8);
+}
+
+eval { require POSIX; POSIX::WEXITSTATUS($?); };
+
+*_wait2exit = ($@ ? \&_wait2exit_no_POSIX : \&_wait2exit_POSIX);
+
+sub _calc_all_process_status
+{
+    my $self = shift;
+
+    # TODO - factor out the code.
+    $self->wait($?);
+
+    if ($self->wait() && $self->_is_vms())
+    {
+        eval q{use vmsish "status"; $self->exit($?);};
+    }
+    else
+    {
+        $self->exit($self->_wait2exit($self->wait()));
+    }
+    # It is possible $? is set agains because of the use vmsish
+    # call.
+    if ($? != 0)
+    {
+        $self->passing(0);
+    }
+
+    return;
 }
 
 =head2 $self->bonus()
