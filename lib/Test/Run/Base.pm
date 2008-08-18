@@ -23,6 +23,8 @@ use Test::Run::Sprintf::Named::FromAccessors;
 
 use Test::Run::Class::Hierarchy (qw(hierarchy_of rev_hierarchy_of));
 
+use Carp ();
+
 __PACKAGE__->mk_accessors(qw(
     _formatters
 ));
@@ -30,9 +32,8 @@ __PACKAGE__->mk_accessors(qw(
 =head2 $package->new({%args})
 
 The default constructor. Do not over-ride it. Instead over-ride
-L<_initialize()>, which accepts the same arguments on an already constructed
-and blessed object reference. It would probably be re-named to _init()
-soon.
+L<_init()>, which accepts the same arguments on an already constructed
+and blessed object reference.
 
 =cut
 
@@ -42,7 +43,7 @@ sub new
     my $self = {};
     bless $self, $class;
     $self->_formatters({});
-    $self->_initialize(@_);
+    $self->_init(@_);
     return $self;
 }
 
@@ -97,7 +98,15 @@ sub _get_obj_formatter
 
 sub _register_obj_formatter
 {
-    my ($self, $name, $fmt) = @_;
+    my ($self, $args) = @_;
+
+    if (ref($args) ne "HASH")
+    {
+        Carp::confess("The second and only parameter to _register_obj_formatter is not a hashref.");
+    }
+
+    my $name = $args->{name};
+    my $fmt  = $args->{format};
 
     $self->_formatters->{$name} = $self->_get_obj_formatter($fmt);
 

@@ -26,11 +26,11 @@ Test::Run::Core - Base class to run standard TAP scripts.
 
 =head1 VERSION
 
-Version 0.0116
+Version 0.0117
 
 =cut
 
-$VERSION = '0.0116';
+$VERSION = '0.0117';
 
 $ENV{HARNESS_ACTIVE} = 1;
 $ENV{HARNESS_NG_VERSION} = $VERSION;
@@ -116,11 +116,11 @@ sub _get_new_strap
     );
 }
 
-sub _initialize
+sub _init
 {
     my ($self, $args) = @_;
 
-    $self->NEXT::_initialize($args);
+    $self->NEXT::_init($args);
 
     $self->Columns(80);
     $self->Switches("-w");
@@ -169,8 +169,10 @@ sub _initialize
     );
 
     $self->_register_obj_formatter(
-        "fail_other_except",
-        "Failed %(_get_fail_test_scripts_string)s%(_get_fail_tests_good_percent_string)s.%(_get_sub_percent_msg)s\n"
+        {
+            name => "fail_other_except",
+            format => "Failed %(_get_fail_test_scripts_string)s%(_get_fail_tests_good_percent_string)s.%(_get_sub_percent_msg)s\n"
+        },
     );
 
     $self->Strap(

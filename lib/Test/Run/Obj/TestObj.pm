@@ -71,15 +71,17 @@ sub _get_private_fields
 
 __PACKAGE__->mk_accessors(@fields);
 
-sub _initialize
+sub _init
 {
     my ($self, $args) = @_;
 
-    $self->NEXT::_initialize($args);
+    $self->NEXT::_init($args);
 
     $self->_register_obj_formatter(
-        "dont_know_which_tests_failed",
-        "Don't know which tests failed: got %(ok)s ok, expected %(max)s",
+        {
+            name => "dont_know_which_tests_failed",
+            format => "Don't know which tests failed: got %(ok)s ok, expected %(max)s",
+        },
     );
 
     return 0;

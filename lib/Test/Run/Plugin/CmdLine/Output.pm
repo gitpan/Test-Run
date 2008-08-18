@@ -53,11 +53,11 @@ sub _named_printf
         );
 }
 
-sub _initialize
+sub _init
 {
     my $self = shift;
 
-    $self->NEXT::_initialize(@_);
+    $self->NEXT::_init(@_);
 
     my ($args) = @_;
 
@@ -104,7 +104,9 @@ sub _initialize
 
         while (my ($id, $format) = each(%obj_formatters))
         {
-            $self->_register_obj_formatter($id, $format);
+            $self->_register_obj_formatter(
+                { name => $id, format => $format,},
+            );
         }
     }
 
