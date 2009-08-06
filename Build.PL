@@ -17,10 +17,10 @@ my $build = Test::Run::Builder->new(
     },
     requires => 
     {
-        'Class::Accessor' => 0,
         'File::Spec' => 0.6,
         'List::Util' => 0,
         'List::MoreUtils' => 0,
+        'Moose' => 0,
         'MRO::Compat' => 0,
         'Scalar::Util' => 0,
         'TAP::Parser' => "3.09",
@@ -31,6 +31,31 @@ my $build = Test::Run::Builder->new(
     dist_version_from => "lib/Test/Run/Core.pm",
     license => "mit",
     create_makefile_pl => 'traditional',
+    meta_merge =>
+    {
+        resources =>
+        {
+            repository => "http://svn.berlios.de/svnroot/repos/web-cpan/Test-Harness-NG/",
+            homepage => "http://web-cpan.berlios.de/modules/Test-Run/",
+        },
+        keywords =>
+        [
+            "back-end",
+            "harness",
+            "prove",
+            "qa",
+            "QA",
+            "quality assurance",
+            "run",
+            "runprove",
+            "tap",
+            "TAP",
+            "TAP::Harness",
+            "test",
+            "testing",
+        ],
+    },
+
 );
 
 $build->create_build_script;
