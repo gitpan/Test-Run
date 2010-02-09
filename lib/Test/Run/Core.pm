@@ -33,11 +33,11 @@ Test::Run::Core - Base class to run standard TAP scripts.
 
 =head1 VERSION
 
-Version 0.0121
+Version 0.0122
 
 =cut
 
-$VERSION = '0.0121';
+$VERSION = '0.0122';
 
 $ENV{HARNESS_ACTIVE} = 1;
 $ENV{HARNESS_NG_VERSION} = $VERSION;
@@ -49,79 +49,43 @@ END
     delete $ENV{HARNESS_NG_VERSION};
 }
 
-sub _get_simple_params
-{
-    my $self = shift;
-
-    return $self->accum_array(
-        {
-            method => "_get_private_simple_params",
-        }
-    );
-}
-
-sub _get_private_simple_params
-{
-    return
-        [qw(
-            Columns
-            Debug
-            Leaked_Dir
-            NoTty
-            Switches
-            Switches_Env
-            test_files
-            test_files_data
-            Test_Interpreter
-            Timer
-            Verbose
-       )];
-}
-
 has "_bonusmsg" => (is => "rw", isa => "Str");
-has "dir_files" => (is => "rw", isa => "ArrayRef");
+has "dir_files" => (is => "rw", isa => "ArrayRef", lazy => 1, 
+    default => sub { [] },
+);
 has "_new_dir_files" => (is => "rw", isa => "Maybe[ArrayRef]");
 has "failed_tests" => (is => "rw", isa => "HashRef");
 has "format_columns" => (is => "rw", isa => "Num");
 has "last_test_elapsed" => (is => "rw", isa => "Str");
 has "last_test_obj" => (is => "rw", isa => "Test::Run::Obj::TestObj");
 has "last_test_results" => (is => "rw", isa => "Test::Run::Straps::StrapsTotalsObj");
-has "list_len" => (is => "rw", isa => "Num");
+has "list_len" => (is => "rw", isa => "Num", default => 0);
 has "max_namelen" => (is => "rw", isa => "Num");
 
 # I don't know for sure what output is. It is Test::Run::Output in 
 # Test::Run::Plugin::CmdLine::Output but could be different elsewhere.
 has "output" => (is => "rw", isa => "Ref");
 has "_start_time" => (is => "rw", isa => "Num");
-has "Strap" => (is => "rw", isa => "Test::Run::Straps");
+has "Strap" => (is => "rw", isa => "Test::Run::Straps",
+    lazy => 1, builder => "_get_new_strap"
+);
 has "tot" => (is => "rw", isa => "Test::Run::Obj::TotObj");
 has "width" => (is => "rw", isa => "Num");
 
 # Private Simple Params of _get_private_simple_params
-has "Columns" => (is => "rw", isa => "Num");
+has "Columns" => (is => "rw", isa => "Num", default => "80");
 has "Debug" => (is => "rw", isa => "Bool");
 has "Leaked_Dir" => (is => "rw", isa => "Str");
 has "NoTty" => (is => "rw", isa => "Bool");
-has "Switches" => (is => "rw", isa => "Maybe[Str]");
+has "Switches" => (is => "rw", isa => "Maybe[Str]", default => "-w",);
 has "Switches_Env" => (is => "rw", isa => "Maybe[Str]");
 has "test_files" => (is => "rw", isa => "ArrayRef");
-has "test_files_data" => (is => "rw", isa => "HashRef");
+has "test_files_data" => (is => "rw", isa => "HashRef", 
+    default => sub { +{} },
+);
 has "Test_Interpreter" => (is => "rw", isa => "Maybe[Str]");
 has "Timer" => (is => "rw", isa => "Bool");
 has "Verbose" => (is => "rw", isa => "Bool");
-
-
-sub _init_simple_params
-{
-    my ($self, $args) = @_;
-    foreach my $key (@{$self->_get_simple_params()})
-    {
-        if (exists($args->{$key}))
-        {
-            $self->$key($args->{$key});
-        }
-    }
-}
 
 sub _get_new_strap
 {
@@ -135,18 +99,15 @@ sub _get_new_strap
     );
 }
 
-sub _init
+=head2 BUILD
+
+For Moose.
+
+=cut
+
+sub BUILD
 {
-    my ($self, $args) = @_;
-
-    $self->maybe::next::method($args);
-
-    $self->Columns(80);
-    $self->Switches("-w");
-    $self->_init_simple_params($args);
-    $self->dir_files([]);
-    $self->test_files_data({});
-    $self->list_len(0);
+    my $self = shift;
 
     $self->register_pluggable_helper(
         {
@@ -193,10 +154,6 @@ sub _init
             name => "fail_other_except",
             format => "Failed %(_get_fail_test_scripts_string)s%(_get_fail_tests_good_percent_string)s.%(_get_sub_percent_msg)s\n"
         },
-    );
-
-    $self->Strap(
-        $self->_get_new_strap($args),
     );
 
     return 0;
@@ -450,13 +407,6 @@ sub _init_tot
     );
 }
 
-sub _tot_add
-{
-    my ($self, $field, $diff) = @_;
-
-    $self->tot()->add($field, $diff);
-}
-
 sub _tot_inc
 {
     my ($self, $field) = @_;
@@ -543,32 +493,15 @@ sub _tap_event_strap_callback
     return $self->_tap_event_handle_strap($args);
 }
 
-sub _tap_event__calc_conds_raw
-{
-    my $self = shift;
-
-    return
-    [
-        [ plan => "header" ],
-        [ bailout => "bailout" ],
-        [ test => "test" ],
-    ];
-}
-
 sub _tap_event__calc_conds
 {
     my $self = shift;
 
     return
     [
-        map
-        {
-            my $c = $_;
-            my $cond = "is_$c->[0]";
-            my $handler = "_strap_$c->[1]_handler";
-            +{ cond => $cond, handler => $handler, };
-        }
-        @{$self->_tap_event__calc_conds_raw()}
+        { cond => "is_plan", handler => "_strap_header_handler", },
+        { cond => "is_bailout", handler => "_strap_bailout_handler", },
+        { cond => "is_test", handler => "_strap_test_handler"},
     ];
 }
 

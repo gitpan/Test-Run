@@ -40,32 +40,20 @@ use overload
 
 extends(qw(Test::Run::Base::Struct));
 
-@fields = (qw(
-    package
-    file
-    line
-    text
-));
-
-sub _get_private_fields
-{
-    return [@fields];
-}
-
 has 'package' => (is => "rw", isa => "Str");
 has 'file' => (is => "rw", isa => "Str");
 has 'line' => (is => "rw", isa => "Num");
 has 'text' => (is => "rw", isa => "Str");
 
-sub _init
+=head2 BUILD
+
+For Moose.
+
+=cut
+
+sub BUILD
 {
     my $self = shift;
-
-    # Workaround to make next::method behave.
-    # It misbehaves upon a stringification operation.
-    $self->text(Scalar::Util::refaddr($self));
-
-    $self->next::method(@_);
 
     my ($pkg,$file,$line) = caller(1);
     $self->package($pkg);
@@ -113,20 +101,10 @@ use vars qw(@ISA);
 
 package Test::Run::Obj::Error::TestsFail::Bailout;
 
-use vars qw(@ISA @fields);
-
 use Moose;
 
-sub _get_private_fields
-{
-    my $self = shift;
-
-    return [@fields];
-}
 
 extends(qw(Test::Run::Obj::Error::TestsFail));
-
-@fields = (qw(bailout_reason));
 
 has 'bailout_reason' => (is => "rw", isa => "Str");
 

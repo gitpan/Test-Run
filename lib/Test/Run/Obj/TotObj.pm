@@ -37,13 +37,6 @@ extends("Test::Run::Base::Struct");
     todo
 ));
 
-@fields = (@counter_fields, 'tests');
-
-sub _get_private_fields
-{
-    return [@fields];
-}
-
 %counter_fields_map = (map { $_ => 1 } @counter_fields);
 
 has 'bad' => (is => "rw", isa => "Num");
@@ -69,11 +62,15 @@ sub _pre_init
     return 0;
 }
 
-sub _init
+=head2 BUILD
+
+For Moose.
+
+=cut
+
+sub BUILD
 {
     my $self = shift;
-
-    $self->next::method(@_);
 
     $self->_register_obj_formatter(
         {

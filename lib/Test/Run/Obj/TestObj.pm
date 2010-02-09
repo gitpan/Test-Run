@@ -19,18 +19,6 @@ use MRO::Compat;
 
 use Test::Run::Obj::IntOrUnknown;
 
-@fields = (qw(
-    ok
-    next
-    max
-    failed
-    bonus
-    skipped
-    skip_reason
-    skip_all
-    ml
-));
-
 =head1 FIELDS
 
 =head2 $self->bonus()
@@ -68,11 +56,6 @@ The skip reason for the last skipped test that specified such a reason.
 
 =cut
 
-sub _get_private_fields
-{
-    return [@fields];
-}
-
 has 'bonus' => (is => "rw", isa => "Num");
 has 'failed' => (is => "rw", isa => "ArrayRef");
 has 'max' => (is => "rw", isa => "Num");
@@ -83,11 +66,15 @@ has 'skip_all' => (is => "rw", isa => "Maybe[Str]");
 has 'skipped' => (is => "rw", isa => "Num");
 has 'skip_reason' => (is => "rw", isa => "Maybe[Str]");
 
-sub _init
-{
-    my ($self, $args) = @_;
+=head2 BUILD
 
-    $self->next::method($args);
+For Moose.
+
+=cut
+
+sub BUILD
+{
+    my $self = shift;
 
     $self->_register_obj_formatter(
         {
@@ -96,7 +83,7 @@ sub _init
         },
     );
 
-    return 0;
+    return;
 }
 
 =head2 $self->add_to_failed(@failures)
