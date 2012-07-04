@@ -4,7 +4,7 @@
       "unknown"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.3901, CPAN::Meta::Converter version 2.120921",
+   "generated_by" : "Module::Build version 0.4, CPAN::Meta::Converter version 2.120921",
    "keywords" : [
       "back-end",
       "harness",
@@ -36,7 +36,7 @@
       },
       "configure" : {
          "requires" : {
-            "Module::Build" : "0.39"
+            "Module::Build" : "0.4"
          }
       },
       "runtime" : {
@@ -86,7 +86,7 @@
       },
       "Test::Run::Core" : {
          "file" : "lib/Test/Run/Core.pm",
-         "version" : "0.0124"
+         "version" : "0.0125"
       },
       "Test::Run::Core_GplArt" : {
          "file" : "lib/Test/Run/Core_GplArt.pm",
@@ -98,7 +98,7 @@
       },
       "Test::Run::Obj" : {
          "file" : "lib/Test/Run/Obj.pm",
-         "version" : "0.0124"
+         "version" : "0.0125"
       },
       "Test::Run::Obj::CanonFailedObj" : {
          "file" : "lib/Test/Run/Obj/CanonFailedObj.pm",
@@ -146,7 +146,7 @@
       },
       "Test::Run::Obj::IntOrUnknown::Moose" : {
          "file" : "lib/Test/Run/Obj/IntOrUnknown/Moose.pm",
-         "version" : "0.0124"
+         "version" : "0.0125"
       },
       "Test::Run::Obj::TestObj" : {
          "file" : "lib/Test/Run/Obj/TestObj.pm",
@@ -170,7 +170,7 @@
       },
       "Test::Run::Straps" : {
          "file" : "lib/Test/Run/Straps.pm",
-         "version" : "0.0124"
+         "version" : "0.0125"
       },
       "Test::Run::Straps::Base" : {
          "file" : "lib/Test/Run/Straps/Base.pm",
@@ -201,11 +201,11 @@
    "resources" : {
       "homepage" : "http://web-cpan.berlios.de/modules/Test-Run/",
       "license" : [
-         "http://www.opensource.org/licenses/mit-license.php"
+         "http://opensource.org/licenses/mit-license.php"
       ],
       "repository" : {
          "url" : "http://svn.berlios.de/svnroot/repos/web-cpan/Test-Harness-NG/"
       }
    },
-   "version" : "0.0124"
+   "version" : "0.0125"
 }

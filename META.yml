@@ -5,9 +5,9 @@ author:
 build_requires:
   Test::Trap: 0
 configure_requires:
-  Module::Build: 0.39
+  Module::Build: 0.4
 dynamic_config: 1
-generated_by: 'Module::Build version 0.3901, CPAN::Meta::Converter version 2.120921'
+generated_by: 'Module::Build version 0.4, CPAN::Meta::Converter version 2.120921'
 keywords:
   - back-end
   - harness
@@ -51,7 +51,7 @@ provides:
     version: 0
   Test::Run::Core:
     file: lib/Test/Run/Core.pm
-    version: 0.0124
+    version: 0.0125
   Test::Run::Core_GplArt:
     file: lib/Test/Run/Core_GplArt.pm
     version: 0
@@ -60,7 +60,7 @@ provides:
     version: 0
   Test::Run::Obj:
     file: lib/Test/Run/Obj.pm
-    version: 0.0124
+    version: 0.0125
   Test::Run::Obj::CanonFailedObj:
     file: lib/Test/Run/Obj/CanonFailedObj.pm
     version: 0
@@ -96,7 +96,7 @@ provides:
     version: 0
   Test::Run::Obj::IntOrUnknown::Moose:
     file: lib/Test/Run/Obj/IntOrUnknown/Moose.pm
-    version: 0.0124
+    version: 0.0125
   Test::Run::Obj::TestObj:
     file: lib/Test/Run/Obj/TestObj.pm
     version: 0
@@ -114,7 +114,7 @@ provides:
     version: 0
   Test::Run::Straps:
     file: lib/Test/Run/Straps.pm
-    version: 0.0124
+    version: 0.0125
   Test::Run::Straps::Base:
     file: lib/Test/Run/Straps/Base.pm
     version: 0
@@ -147,6 +147,6 @@ requires:
   UNIVERSAL::require: 0
 resources:
   homepage: http://web-cpan.berlios.de/modules/Test-Run/
-  license: http://www.opensource.org/licenses/mit-license.php
+  license: http://opensource.org/licenses/mit-license.php
   repository: http://svn.berlios.de/svnroot/repos/web-cpan/Test-Harness-NG/
-version: 0.0124
+version: 0.0125
