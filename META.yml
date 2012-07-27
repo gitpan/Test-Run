@@ -5,9 +5,9 @@ author:
 build_requires:
   Test::Trap: 0
 configure_requires:
-  Module::Build: 0.4
+  Module::Build: 0.39
 dynamic_config: 1
-generated_by: 'Module::Build version 0.4, CPAN::Meta::Converter version 2.120921'
+generated_by: 'Module::Build version 0.3901, CPAN::Meta::Converter version 2.120921'
 keywords:
   - back-end
   - harness
@@ -51,7 +51,7 @@ provides:
     version: 0
   Test::Run::Core:
     file: lib/Test/Run/Core.pm
-    version: 0.0125
+    version: 0.0126
   Test::Run::Core_GplArt:
     file: lib/Test/Run/Core_GplArt.pm
     version: 0
@@ -135,6 +135,7 @@ provides:
     version: 0
 requires:
   File::Spec: 0.6
+  IPC::System::Simple: 1.21
   List::MoreUtils: 0
   List::Util: 0
   MRO::Compat: 0
@@ -147,6 +148,6 @@ requires:
   UNIVERSAL::require: 0
 resources:
   homepage: http://web-cpan.berlios.de/modules/Test-Run/
-  license: http://opensource.org/licenses/mit-license.php
+  license: http://www.opensource.org/licenses/mit-license.php
   repository: http://svn.berlios.de/svnroot/repos/web-cpan/Test-Harness-NG/
-version: 0.0125
+version: 0.0126

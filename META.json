@@ -4,7 +4,7 @@
       "unknown"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.4, CPAN::Meta::Converter version 2.120921",
+   "generated_by" : "Module::Build version 0.3901, CPAN::Meta::Converter version 2.120921",
    "keywords" : [
       "back-end",
       "harness",
@@ -36,12 +36,13 @@
       },
       "configure" : {
          "requires" : {
-            "Module::Build" : "0.4"
+            "Module::Build" : "0.39"
          }
       },
       "runtime" : {
          "requires" : {
             "File::Spec" : "0.6",
+            "IPC::System::Simple" : "1.21",
             "List::MoreUtils" : "0",
             "List::Util" : "0",
             "MRO::Compat" : "0",
@@ -86,7 +87,7 @@
       },
       "Test::Run::Core" : {
          "file" : "lib/Test/Run/Core.pm",
-         "version" : "0.0125"
+         "version" : "0.0126"
       },
       "Test::Run::Core_GplArt" : {
          "file" : "lib/Test/Run/Core_GplArt.pm",
@@ -201,11 +202,11 @@
    "resources" : {
       "homepage" : "http://web-cpan.berlios.de/modules/Test-Run/",
       "license" : [
-         "http://opensource.org/licenses/mit-license.php"
+         "http://www.opensource.org/licenses/mit-license.php"
       ],
       "repository" : {
          "url" : "http://svn.berlios.de/svnroot/repos/web-cpan/Test-Harness-NG/"
       }
    },
-   "version" : "0.0125"
+   "version" : "0.0126"
 }
