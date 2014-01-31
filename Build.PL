@@ -11,11 +11,12 @@ use Test::Run::Builder;
 
 my $build = Test::Run::Builder->new(
     module_name => "Test::Run",
+    configure_requires => { 'Module::Build' => '0.36', },
     build_requires =>
     {
         "Test::Trap" => 0,
     },
-    requires => 
+    requires =>
     {
         'File::Spec' => 0.6,
         'IPC::System::Simple' => '1.21',
@@ -29,6 +30,7 @@ my $build = Test::Run::Builder->new(
         'Test::Harness' => "2.53",
         'Text::Sprintf::Named' => '0.02',
         'UNIVERSAL::require' => 0,
+        'perl' => '5.008',
     },
     dist_version_from => "lib/Test/Run/Core.pm",
     license => "mit",
@@ -37,7 +39,7 @@ my $build = Test::Run::Builder->new(
     {
         resources =>
         {
-            repository => "http://svn.berlios.de/svnroot/repos/web-cpan/Test-Harness-NG/",
+            repository => "http://bitbucket.org/shlomif/perl-test-run",
             homepage => "http://web-cpan.berlios.de/modules/Test-Run/",
         },
         keywords =>

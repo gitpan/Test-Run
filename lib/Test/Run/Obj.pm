@@ -3,6 +3,8 @@ package Test::Run::Obj;
 use strict;
 use warnings;
 
+use 5.008;
+
 use vars qw(@ISA $VERSION);
 
 use Test::Run::Core;
@@ -14,11 +16,11 @@ Test::Run::Obj - Run Perl standard test scripts with statistics
 
 =head1 VERSION
 
-Version 0.0125
+Version 0.0301
 
 =cut
 
-$VERSION = "0.0125";
+$VERSION = '0.0301';
 
 @ISA = (qw(
     Test::Run::Plugin::CmdLine::Output

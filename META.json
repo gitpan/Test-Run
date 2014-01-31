@@ -4,7 +4,7 @@
       "unknown"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.3901, CPAN::Meta::Converter version 2.120921",
+   "generated_by" : "Module::Build version 0.4007, CPAN::Meta::Converter version 2.132830",
    "keywords" : [
       "back-end",
       "harness",
@@ -36,7 +36,7 @@
       },
       "configure" : {
          "requires" : {
-            "Module::Build" : "0.39"
+            "Module::Build" : "0.36"
          }
       },
       "runtime" : {
@@ -52,150 +52,121 @@
             "TAP::Parser" : "3.09",
             "Test::Harness" : "2.53",
             "Text::Sprintf::Named" : "0.02",
-            "UNIVERSAL::require" : "0"
+            "UNIVERSAL::require" : "0",
+            "perl" : "5.008"
          }
       }
    },
    "provides" : {
       "Test::Run" : {
-         "file" : "lib/Test/Run.pm",
-         "version" : 0
+         "file" : "lib/Test/Run.pm"
       },
       "Test::Run::Assert" : {
          "file" : "lib/Test/Run/Assert.pm",
-         "version" : "0.03"
+         "version" : "0.0301"
       },
       "Test::Run::Base" : {
-         "file" : "lib/Test/Run/Base.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Base.pm"
       },
       "Test::Run::Base::PlugHelpers" : {
-         "file" : "lib/Test/Run/Base/PlugHelpers.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Base/PlugHelpers.pm"
       },
       "Test::Run::Base::Plugger" : {
-         "file" : "lib/Test/Run/Base/Plugger.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Base/Plugger.pm"
       },
       "Test::Run::Base::Struct" : {
-         "file" : "lib/Test/Run/Base/Struct.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Base/Struct.pm"
       },
       "Test::Run::Class::Hierarchy" : {
-         "file" : "lib/Test/Run/Class/Hierarchy.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Class/Hierarchy.pm"
       },
       "Test::Run::Core" : {
          "file" : "lib/Test/Run/Core.pm",
-         "version" : "0.0126"
+         "version" : "0.0301"
       },
       "Test::Run::Core_GplArt" : {
-         "file" : "lib/Test/Run/Core_GplArt.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Core_GplArt.pm"
       },
       "Test::Run::Iface" : {
-         "file" : "lib/Test/Run/Iface.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Iface.pm"
       },
       "Test::Run::Obj" : {
          "file" : "lib/Test/Run/Obj.pm",
-         "version" : "0.0125"
+         "version" : "0.0301"
       },
       "Test::Run::Obj::CanonFailedObj" : {
-         "file" : "lib/Test/Run/Obj/CanonFailedObj.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/CanonFailedObj.pm"
       },
       "Test::Run::Obj::Error" : {
-         "file" : "lib/Test/Run/Obj/Error.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/Error.pm"
       },
       "Test::Run::Obj::Error::Straps" : {
-         "file" : "lib/Test/Run/Obj/Error.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/Error.pm"
       },
       "Test::Run::Obj::Error::Straps::CannotRunPerl" : {
-         "file" : "lib/Test/Run/Obj/Error.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/Error.pm"
       },
       "Test::Run::Obj::Error::TestsFail" : {
-         "file" : "lib/Test/Run/Obj/Error.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/Error.pm"
       },
       "Test::Run::Obj::Error::TestsFail::Bailout" : {
-         "file" : "lib/Test/Run/Obj/Error.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/Error.pm"
       },
       "Test::Run::Obj::Error::TestsFail::NoOutput" : {
-         "file" : "lib/Test/Run/Obj/Error.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/Error.pm"
       },
       "Test::Run::Obj::Error::TestsFail::NoTestsRun" : {
-         "file" : "lib/Test/Run/Obj/Error.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/Error.pm"
       },
       "Test::Run::Obj::Error::TestsFail::Other" : {
-         "file" : "lib/Test/Run/Obj/Error.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/Error.pm"
       },
       "Test::Run::Obj::FailedObj" : {
-         "file" : "lib/Test/Run/Obj/FailedObj.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/FailedObj.pm"
       },
       "Test::Run::Obj::IntOrUnknown" : {
-         "file" : "lib/Test/Run/Obj/IntOrUnknown.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/IntOrUnknown.pm"
       },
       "Test::Run::Obj::IntOrUnknown::Moose" : {
          "file" : "lib/Test/Run/Obj/IntOrUnknown/Moose.pm",
-         "version" : "0.0125"
+         "version" : "0.0301"
       },
       "Test::Run::Obj::TestObj" : {
-         "file" : "lib/Test/Run/Obj/TestObj.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/TestObj.pm"
       },
       "Test::Run::Obj::TotObj" : {
-         "file" : "lib/Test/Run/Obj/TotObj.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Obj/TotObj.pm"
       },
       "Test::Run::Output" : {
-         "file" : "lib/Test/Run/Output.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Output.pm"
       },
       "Test::Run::Plugin::CmdLine::Output" : {
-         "file" : "lib/Test/Run/Plugin/CmdLine/Output.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Plugin/CmdLine/Output.pm"
       },
       "Test::Run::Sprintf::Named::FromAccessors" : {
-         "file" : "lib/Test/Run/Sprintf/Named/FromAccessors.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Sprintf/Named/FromAccessors.pm"
       },
       "Test::Run::Straps" : {
          "file" : "lib/Test/Run/Straps.pm",
-         "version" : "0.0125"
+         "version" : "0.0301"
       },
       "Test::Run::Straps::Base" : {
-         "file" : "lib/Test/Run/Straps/Base.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Straps/Base.pm"
       },
       "Test::Run::Straps::EventWrapper" : {
-         "file" : "lib/Test/Run/Straps/EventWrapper.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Straps/EventWrapper.pm"
       },
       "Test::Run::Straps::StrapsDetailsObj" : {
-         "file" : "lib/Test/Run/Straps/StrapsDetailsObj.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Straps/StrapsDetailsObj.pm"
       },
       "Test::Run::Straps::StrapsTotalsObj" : {
-         "file" : "lib/Test/Run/Straps/StrapsTotalsObj.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Straps/StrapsTotalsObj.pm"
       },
       "Test::Run::Straps_GplArt" : {
-         "file" : "lib/Test/Run/Straps_GplArt.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Straps_GplArt.pm"
       },
       "Test::Run::Trap::Obj" : {
-         "file" : "lib/Test/Run/Trap/Obj.pm",
-         "version" : 0
+         "file" : "lib/Test/Run/Trap/Obj.pm"
       }
    },
    "release_status" : "stable",
@@ -205,8 +176,8 @@
          "http://www.opensource.org/licenses/mit-license.php"
       ],
       "repository" : {
-         "url" : "http://svn.berlios.de/svnroot/repos/web-cpan/Test-Harness-NG/"
+         "url" : "http://bitbucket.org/shlomif/perl-test-run"
       }
    },
-   "version" : "0.0126"
+   "version" : "0.0301"
 }

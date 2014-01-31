@@ -32,10 +32,13 @@ lib/Test/Run/Straps.pm
 lib/Test/Run/Straps/StrapsDetailsObj.pm
 lib/Test/Run/Straps/StrapsTotalsObj.pm
 lib/Test/Run/Trap/Obj.pm
+LICENSE
 Makefile.PL
 MANIFEST
 META.yml                                 Module meta-data (added by MakeMaker)
 NOTES
+README
+scripts/bump-version-number.pl
 t/00compile.t
 t/01unit-event-wrapper.t
 t/accumulate.t
@@ -100,6 +103,7 @@ t/sample-tests/vms_nit
 t/sample-tests/with_comments
 t/sample-tests/with-myhello
 t/sample-tests/with-myhello-and-myfoo
+t/style-trailing-space.t
 t/switches.t
 t/test-failure-report.t
 t/test-harness.t

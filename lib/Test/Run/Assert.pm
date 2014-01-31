@@ -6,7 +6,7 @@ use warnings;
 require Exporter;
 use vars qw($VERSION @EXPORT @ISA);
 
-$VERSION = '0.03';
+$VERSION = '0.0301';
 
 @ISA = qw(Exporter);
 @EXPORT = qw(assert);
@@ -38,10 +38,10 @@ sub assert($;$)
     if (! $condition)
     {
         require Carp;
-        
-        my $msg = 
+
+        my $msg =
             sprintf("Assert failed - '%s'!", $name)
-            ; 
+            ;
 
         Carp::croak($msg);
     }
