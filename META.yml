@@ -32,7 +32,7 @@ provides:
     file: lib/Test/Run.pm
   Test::Run::Assert:
     file: lib/Test/Run/Assert.pm
-    version: 0.0301
+    version: 0.0302
   Test::Run::Base:
     file: lib/Test/Run/Base.pm
   Test::Run::Base::PlugHelpers:
@@ -45,14 +45,14 @@ provides:
     file: lib/Test/Run/Class/Hierarchy.pm
   Test::Run::Core:
     file: lib/Test/Run/Core.pm
-    version: 0.0301
+    version: 0.0302
   Test::Run::Core_GplArt:
     file: lib/Test/Run/Core_GplArt.pm
   Test::Run::Iface:
     file: lib/Test/Run/Iface.pm
   Test::Run::Obj:
     file: lib/Test/Run/Obj.pm
-    version: 0.0301
+    version: 0.0302
   Test::Run::Obj::CanonFailedObj:
     file: lib/Test/Run/Obj/CanonFailedObj.pm
   Test::Run::Obj::Error:
@@ -77,7 +77,7 @@ provides:
     file: lib/Test/Run/Obj/IntOrUnknown.pm
   Test::Run::Obj::IntOrUnknown::Moose:
     file: lib/Test/Run/Obj/IntOrUnknown/Moose.pm
-    version: 0.0301
+    version: 0.0302
   Test::Run::Obj::TestObj:
     file: lib/Test/Run/Obj/TestObj.pm
   Test::Run::Obj::TotObj:
@@ -90,7 +90,7 @@ provides:
     file: lib/Test/Run/Sprintf/Named/FromAccessors.pm
   Test::Run::Straps:
     file: lib/Test/Run/Straps.pm
-    version: 0.0301
+    version: 0.0302
   Test::Run::Straps::Base:
     file: lib/Test/Run/Straps/Base.pm
   Test::Run::Straps::EventWrapper:
@@ -121,4 +121,4 @@ resources:
   homepage: http://web-cpan.berlios.de/modules/Test-Run/
   license: http://www.opensource.org/licenses/mit-license.php
   repository: http://bitbucket.org/shlomif/perl-test-run
-version: 0.0301
+version: 0.0302
